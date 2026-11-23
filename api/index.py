@@ -1,5 +1,9 @@
-"""Vercel function behind /api/* (one ASGI app, routed by vercel.json):
+"""Vercel entrypoint: one FastAPI app (Vercel's FastAPI preset finds it here and
+routes every path to it; files in public/ are served first).
 POST /api/analyze scores one topic page, POST /api/search finds topic pages.
+
+No rewrite in vercel.json: a rewrite to /api/index replaces the path the app
+sees, and every route then answers 404 (measured on the first deployment).
 
 Repository and B-API come from the environment (see .env.example); a request
 can only choose *which* topic page and how it is scored. With DEMO_PASSWORD
@@ -17,7 +21,7 @@ from typing import Literal
 # The package lives next to api/, not on the function's import path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi import FastAPI, Header  # noqa: E402
+from fastapi import FastAPI, Header, Request as HTTPRequest  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
@@ -59,6 +63,13 @@ def _authorized(given: str) -> bool:
 
 def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"error": message}, status_code=status)
+
+
+@app.exception_handler(404)
+async def not_found(request: HTTPRequest, exc: Exception) -> JSONResponse:
+    # Name the path the app actually received: when routing goes wrong this is
+    # the one fact that shows where.
+    return _error(404, f"Keine Route für {request.method} {request.url.path}.")
 
 
 def _hosts() -> tuple[str, ...]:

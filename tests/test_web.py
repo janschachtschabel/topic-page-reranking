@@ -197,3 +197,14 @@ def test_root_serves_the_page(monkeypatch):
     res = TestClient(mod.app).get("/")
     assert res.status_code == 200 and "text/html" in res.headers["content-type"]
     assert "Themenseiten-Check" in res.text
+
+
+def test_unknown_route_names_the_path(monkeypatch):
+    mod = _load_app(monkeypatch)
+    res = TestClient(mod.app).post("/api/index", json={})
+    assert res.status_code == 404 and "/api/index" in res.json()["error"]
+
+
+def test_vercel_config_has_no_path_changing_rewrite():
+    config = json.loads((Path(__file__).resolve().parent.parent / "vercel.json").read_text())
+    assert "rewrites" not in config
