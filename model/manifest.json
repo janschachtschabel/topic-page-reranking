@@ -1,0 +1,51 @@
+{
+  "model": "cross-encoder/msmarco-MiniLM-L12-en-de-v1",
+  "revision": "6956d9226bd4adaf96a383bcbc5ab61acf4a4b7e",
+  "quantization": "int8 (onnxruntime quantize_dynamic, QInt8)",
+  "created": "2026-11-23T22:12:18+00:00",
+  "files": {
+    "model.onnx": {
+      "bytes": 22342094,
+      "sha256": "3d86f725f3d2fe01c5477f1d00f7fcdd7635cf8fa6bb5fcbb679f475c7b7747c"
+    },
+    "weights-00.bin": {
+      "bytes": 96014208,
+      "sha256": "fbc2bab18977b429c5d1ba3ee66b9aaa8f474abe06a7dbcbfca65aa71e1ee2ce"
+    },
+    "tokenizer.json": {
+      "bytes": 9096735,
+      "sha256": "96ef91dd5d1c3b157a0437e85ff1f29d0eb3cf32fd40f863dab45baa5e839fad"
+    },
+    "config.json": {
+      "bytes": 841,
+      "sha256": "70b49b682ed56f004c115feb86409daee2bca07b4e3e995741262e8062adf07c"
+    }
+  },
+  "total_mib": 121.5,
+  "check_fp32_vs_int8": [
+    {
+      "query": "Optik: Licht, Linsen, Spiegel",
+      "doc": "Sammellinse und Zerstreuungslinse im Versuch",
+      "fp32": -8.9072,
+      "int8": -7.7254
+    },
+    {
+      "query": "Optik: Licht, Linsen, Spiegel",
+      "doc": "Bruchrechnen mit Pizza, Klasse 6",
+      "fp32": -11.1866,
+      "int8": -10.8208
+    },
+    {
+      "query": "Technische Informatik",
+      "doc": "Logikgatter und Halbaddierer",
+      "fp32": -6.4989,
+      "int8": -6.9416
+    },
+    {
+      "query": "Technische Informatik",
+      "doc": "Die Französische Revolution",
+      "fp32": -9.6284,
+      "int8": -9.2855
+    }
+  ]
+}
