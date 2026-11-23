@@ -1,0 +1,5 @@
+# Vercel must build from requirements.txt, not from the CLI's pyproject.toml.
+pyproject.toml
+tests/
+reports/
+.env

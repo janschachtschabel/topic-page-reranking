@@ -1,0 +1,23 @@
+[project]
+name = "themenseiten-check"
+version = "0.1.0"
+description = "Compare WLO topic pages (Themenseiten) with a reranked, filtered version"
+requires-python = ">=3.11"
+dependencies = [
+    "edu-sharing-python-client @ git+https://github.com/janschachtschabel/edu-sharing-python-client",
+]
+
+[project.optional-dependencies]
+# Local cross-encoder reranking (default backend). Pulls in torch.
+local = ["sentence-transformers>=3.0"]
+dev = ["pytest>=8", "fastapi>=0.110,<1"]
+
+[project.scripts]
+themenseiten-check = "themenseiten_check.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["themenseiten_check"]

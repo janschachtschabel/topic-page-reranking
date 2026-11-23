@@ -1,0 +1,4 @@
+# Vercel installs these for api/index.py. The client is pinned to a commit
+# so a push to its main branch cannot change a deployed demo unnoticed.
+edu-sharing-python-client @ git+https://github.com/janschachtschabel/edu-sharing-python-client@7c56160f91210e45ae3a126107ea90607bdb36e5
+fastapi>=0.110,<1
