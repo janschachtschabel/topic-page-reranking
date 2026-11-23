@@ -34,11 +34,11 @@ Vorausgefüllt ist die Optik-Seite; drei Beispiel-Knöpfe (Physik: Optik,
 Mathematik: Räumliche und ebene Geometrie, Informatik: Technische Informatik)
 prüfen mit einem Klick.
 
-**Wo die Texte herkommen:** Die Beschreibung einer Sammlung steht im
-`collection`-Objekt der Sammlungs-API (`GET /collection/v1/collections/-home-/{id}`,
-Feld `collection.description`), nicht in den Eigenschaften, die `describe`
-liest – dort war sie bei Optik leer. Die App fragt deshalb zuerst die
-Sammlungs-API und nimmt die Eigenschaften nur als Rückfall. Der kompendiale Text
+**Wo die Texte herkommen:** Die Beschreibung liest die App wie der WLO-MCP-Server
+(`getTopicPageContent`): zuerst `cclom:general_description` der Sammlung, dann
+`collection.description` aus dem `collection`-Objekt der Knoten-Metadaten – das,
+was die Themenseite als Intro über den Schwimmlinien zeigt –, zuletzt
+`cm:description`. Die Quelle steht im Kopf der Seite. Der kompendiale Text
 (`ccm:oeh_collection_compendium_text`) ist Markdown; Inhaltsverzeichnis,
 Überschriftenzeichen und Links werden vor Anzeige und Abgleich entfernt.
 
@@ -174,7 +174,7 @@ unter den Hinweisen.
 |---|---|
 | `collect.py` | Themenseite in Schwimmlinien lesen: Seitenlayout, Sammlung, Untersammlungen |
 | `saved_search.py` | gespeicherte Widget-Suchen angenähert ausführen |
-| `topic_text.py` | Beschreibung aus der Sammlungs-API, Markdown zu Klartext |
+| `topic_text.py` | Beschreibung wie der MCP-Server lesen, Markdown zu Klartext |
 | `urls.py` | Knoten-ID aus einer edu-sharing-URL oder ID lesen |
 | `portal.py` | Portal-URL (WordPress) auf die Sammlung dahinter auflösen |
 | `serialize.py` | Ergebnis als JSON für die Web-App |

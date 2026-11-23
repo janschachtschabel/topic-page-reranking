@@ -28,7 +28,8 @@ class FakeFlows:
         return {"id": cid, "title": "Optik", "url": "https://wlo/optik",
                 "description": "Licht, Reflexion, Brechung und Linsen.",
                 "keywords": ["Licht", "Linse"],
-                "properties": {"ccm:oeh_collection_compendium_text": ["Optik ist die Lehre vom Licht."]}}
+                "properties": {"ccm:oeh_collection_compendium_text": ["Optik ist die Lehre vom Licht."],
+                               "cclom:general_description": ["Licht, Reflexion, Brechung und Linsen."]}}
 
     async def collection_contents(self, cid, *, limit, offset, properties):
         self.calls.append((cid, limit, offset))
@@ -57,25 +58,30 @@ class FakeProfile:
     compendium_property = "ccm:oeh_collection_compendium_text"
 
 
-class FakeRaw:
-    """The collection endpoint: no description unless a test sets one."""
+class FakeNode:
+    def __init__(self, raw):
+        self.raw = raw
+
+
+class FakeNodes:
+    """``repo.node``: the collection object with a description, or a refusal."""
 
     def __init__(self, description=None, error=None):
         self.description, self.error = description, error
 
-    async def json(self, method, path):
+    async def __call__(self, node_id):
         if self.error:
             raise self.error
         coll = {} if self.description is None else {"description": self.description}
-        return {"collection": {"ref": {"id": "c"}, "collection": coll}}
+        return FakeNode({"ref": {"id": node_id}, "collection": coll})
 
 
 class FakeRepo:
     metadata_profile = FakeProfile()
 
-    def __init__(self, flows, raw=None):
+    def __init__(self, flows, node=None):
         self.flows = flows
-        self.raw = raw or FakeRaw()
+        self.node = node or FakeNodes()
 
 
 class FixedReranker:
@@ -211,25 +217,39 @@ def test_topic_texts_fall_back_and_say_so():
 
 
 
-def test_description_comes_from_the_collection_endpoint_first():
-    flows = FakeFlows({"c": [hit(1, "Licht")]})
-    topic = run(load_topic_page(FakeRepo(flows, FakeRaw("<p>Alles über <b>Licht</b>.</p>")), "c"))
+class NoDescriptionProps(FakeFlows):
+    async def describe(self, cid):
+        return {"id": cid, "title": "Optik", "url": "", "keywords": [],
+                "properties": {"cm:description": ["aus cm:description"]}}
+
+
+def test_description_order_follows_the_mcp_server():
+    # 1. cclom:general_description wins when present
+    topic = run(load_topic_page(FakeRepo(FakeFlows({"c": []}), FakeNodes("aus dem DTO")), "c"))
+    assert (topic.description, topic.description_source) == (
+        "Licht, Reflexion, Brechung und Linsen.", "cclom:general_description")
+    # 2. otherwise collection.description, cleaned of HTML
+    topic = run(load_topic_page(FakeRepo(NoDescriptionProps({"c": []}),
+                                         FakeNodes("<p>Alles über <b>Licht</b></p>")), "c"))
+    assert topic.description_source == "collection.description"
     assert "Licht" in topic.description and "<" not in topic.description
+    # 3. cm:description last
+    topic = run(load_topic_page(FakeRepo(NoDescriptionProps({"c": []})), "c"))
+    assert (topic.description, topic.description_source) == ("aus cm:description", "cm:description")
 
 
-def test_description_falls_back_and_notes_a_refusal():
+def test_refused_node_read_is_noted():
     from edusharing import EduSharingError
-    flows = FakeFlows({"c": [hit(1, "Licht")]})
-    topic = run(load_topic_page(FakeRepo(flows, FakeRaw(error=EduSharingError("403"))), "c"))
-    assert topic.description == "Licht, Reflexion, Brechung und Linsen."   # from describe
-    assert topic.description_source.startswith("Eigenschaften")
+    repo = FakeRepo(NoDescriptionProps({"c": []}), FakeNodes(error=EduSharingError("403")))
+    topic = run(load_topic_page(repo, "c"))
+    assert topic.description == "aus cm:description"
     assert any("Beschreibung der Sammlung nicht lesbar" in n for n in topic.notes)
 
 
 def test_missing_description_is_noted():
     class NoDescription(FakeFlows):
         async def describe(self, cid):
-            return {"id": cid, "title": "Optik", "url": "", "description": "", "keywords": []}
+            return {"id": cid, "title": "Optik", "url": "", "keywords": [], "properties": {}}
     topic = run(load_topic_page(FakeRepo(NoDescription({"c": []})), "c"))
     assert topic.description == ""
     assert any("Keine Beschreibung im Repositorium" in n for n in topic.notes)

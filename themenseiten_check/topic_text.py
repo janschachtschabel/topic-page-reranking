@@ -1,12 +1,12 @@
 """The two texts of a topic page: where they live, and how to read them plainly.
 
-**The description is not where ``describe`` looks.** For materials it sits in
-``cclom:general_description``/``cm:description``; a collection's description is
-written into the ``collection`` object of the collection API (the client's
-``collections.update`` documents it: as ``properties["cm:description"]`` it is
-silently dropped). On staging the Optik collection answered ``describe`` with an
-empty description while its compendium text was full (seen 2026-11-23). So the
-collection endpoint is asked first; the properties stay as a fallback.
+**The description is read the way the WLO MCP server reads it**
+(``topic-page-structure.ts``, ``getTopicPageContent``): the collection's
+``cclom:general_description`` first, then ``collection.description`` -- the
+collection object the node's metadata answer carries -- which is what the page
+renders as its intro above the swimlanes. ``describe`` alone only sees the
+properties; on staging the Optik collection had none there (seen 2026-11-23).
+``cm:description`` comes last, as the property the client's write path uses.
 
 **The compendium text is Markdown** -- an ``::: inhaltsverzeichnis`` block,
 headings, anchor links. ``plain_text`` keeps the words and drops the markup and
@@ -20,22 +20,35 @@ from html import unescape
 from typing import Any
 
 from edusharing import AsyncRepository, EduSharingError
-from edusharing.urls import path_segment
 
 
-async def collection_description(repo: AsyncRepository, collection_id: str,
-                                 notes: list[str]) -> str:
-    """``collection.description`` from the collection endpoint; empty if absent or refused."""
+def _first(value: Any) -> str:
+    if isinstance(value, list):
+        value = value[0] if value else ""
+    return value.strip() if isinstance(value, str) else ""
+
+
+async def description_of(repo: AsyncRepository, collection_id: str,
+                         properties: dict[str, Any], notes: list[str]) -> tuple[str, str]:
+    """The topic page's description and where it was found ('' and '' if nowhere).
+
+    ``properties`` are the collection's raw properties, already fetched by
+    ``describe``; the node is read again only when they hold no description.
+    """
+    text = plain_text(_first(properties.get("cclom:general_description")))
+    if text:
+        return text, "cclom:general_description"
     try:
-        answer = await repo.raw.json(
-            "GET", f"/collection/v1/collections/-home-/{path_segment(collection_id)}")
+        node = await repo.node(collection_id)
     except EduSharingError as exc:
         notes.append(f"Beschreibung der Sammlung nicht lesbar ({type(exc).__name__}).")
-        return ""
-    node: Any = answer.get("collection") if isinstance(answer, dict) else None
-    inner = node.get("collection") if isinstance(node, dict) else None
-    value = inner.get("description") if isinstance(inner, dict) else None
-    return plain_text(value) if isinstance(value, str) else ""
+        node = None
+    collection = (node.raw.get("collection") if node is not None else None) or {}
+    text = plain_text(_first(collection.get("description")) if isinstance(collection, dict) else "")
+    if text:
+        return text, "collection.description"
+    text = plain_text(_first(properties.get("cm:description")))
+    return (text, "cm:description") if text else ("", "")
 
 
 _TOC_LINE = re.compile(r"^\s*[-*+]\s*\[[^\]]*\]\(#[^)]*\)\s*$")

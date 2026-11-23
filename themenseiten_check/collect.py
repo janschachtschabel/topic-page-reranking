@@ -23,7 +23,7 @@ from typing import Any
 from edusharing import AsyncRepository, EduSharingError
 
 from .saved_search import run_saved_search
-from .topic_text import collection_description, plain_text
+from .topic_text import description_of, plain_text
 
 KEYWORD_PROP = "cclom:general_keyword"
 #: Page size for collection listings and describe_many (its own cap is 50).
@@ -240,16 +240,13 @@ async def load_topic_page(repo: AsyncRepository, collection_id: str, *,
             left -= len(found)
             builder.add_lane(f"Untersammlung „{sub['title']}“", "untersammlung", found)
 
-    description = await collection_description(repo, collection_id, builder.notes)
-    source = "collection.description" if description else ""
-    if not description:
-        description = plain_text(meta.get("description") or "")
-        source = "Eigenschaften (cclom:general_description/cm:description)" if description else ""
+    description, source = await description_of(
+        repo, collection_id, meta.get("properties") or {}, builder.notes)
     if not description:
         # Said, because the portal may still show a text: then it lives in
         # WordPress, not in the repository, and this is where to look next.
         builder.notes.append("Keine Beschreibung im Repositorium gefunden (geprüft: "
-                             "collection.description, cclom:general_description, cm:description).")
+                             "cclom:general_description, collection.description, cm:description).")
     return TopicPage(
         id=meta["id"], title=meta["title"],
         description=description, description_source=source,
