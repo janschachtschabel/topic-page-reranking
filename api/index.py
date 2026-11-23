@@ -18,7 +18,7 @@ from typing import Literal
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi import FastAPI, Header  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 from edusharing import AsyncRepository, EduSharingError, NotFoundError  # noqa: E402
@@ -32,6 +32,9 @@ from themenseiten_check.serialize import page_as_json  # noqa: E402
 from themenseiten_check.portal import DEFAULT_HOSTS, NeedsChoice, resolve  # noqa: E402
 
 STAGING = "https://repository.staging.openeduhub.net"
+#: Vercel serves public/ itself -- unless it detects this FastAPI app and routes
+#: every path here, which is what it does today. Then this route answers "/".
+INDEX = Path(__file__).resolve().parent.parent / "public" / "index.html"
 log = logging.getLogger("themenseiten")
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -69,6 +72,13 @@ def _repository() -> AsyncRepository:
     auth = (user, os.environ.get("EDU_SHARING_PASSWORD", "")) if user else None
     return AsyncRepository(os.environ.get("EDU_SHARING_URL", STAGING), auth=auth,
                            metadataset=os.environ.get("EDU_SHARING_METADATASET", "mds_oeh"))
+
+
+@app.get("/", include_in_schema=False)
+async def index():
+    if not INDEX.is_file():
+        return _error(500, "public/index.html fehlt im Deployment.")
+    return FileResponse(INDEX, media_type="text/html; charset=utf-8")
 
 
 @app.post("/api/search")

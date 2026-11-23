@@ -190,3 +190,10 @@ def test_search_endpoint(monkeypatch):
     assert res.status_code == 200 and res.json()["hits"][0]["id"] == "1"
     assert seen == {"text": "Optik", "subject": "Physik"}
     assert client.post("/api/search", json={"text": ""}).status_code == 422
+
+
+def test_root_serves_the_page(monkeypatch):
+    mod = _load_app(monkeypatch)
+    res = TestClient(mod.app).get("/")
+    assert res.status_code == 200 and "text/html" in res.headers["content-type"]
+    assert "Themenseiten-Check" in res.text

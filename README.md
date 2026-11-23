@@ -145,7 +145,7 @@ unter den Hinweisen.
 | `report.py` | HTML-Bericht der Kommandozeile |
 | `cli.py` | Kommandozeile |
 | `api/index.py` | Vercel-Funktion: `POST /api/analyze`, `POST /api/search` |
-| `index.html` | Oberfläche der Web-App |
+| `public/index.html` | Oberfläche der Web-App |
 
 ## Tests
 
