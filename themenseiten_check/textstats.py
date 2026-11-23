@@ -42,12 +42,13 @@ from collections import Counter
 from edusharing.language import GERMAN
 
 from .collect import Item, TopicPage
+from .scoring import DEFAULT_TOPIC_TEXT, topic_texts
 
-#: Field weights. Topic: the description is often portal boilerplate
-#: ("Hier findest du ... Material für Physik"), the compendium says what is meant.
+#: Field weights. On the topic side the text is whichever ``scoring.topic_texts``
+#: chose (description, compendium or both), each at the "text" weight.
 #: Sub-topic titles were tried as topic vocabulary and dropped: their suffixes
 #: ("Geometrische") matched unrelated words ("Elektrischer") on the example set.
-TOPIC_FIELDS = {"title": 3.0, "keywords": 2.0, "compendium": 1.5, "description": 0.5}
+TOPIC_FIELDS = {"title": 3.0, "keywords": 2.0, "text": 1.5}
 ITEM_FIELDS = {"title": 2.0, "keywords": 1.5, "description": 1.0}
 #: 4- and 5-grams: 3-grams ("ung", "ich") match across unrelated words and
 #: blurred the separation on the Optik example set (see tests).
@@ -88,10 +89,9 @@ def _weighted(fields: dict[str, str], weights: dict[str, float]) -> Counter[str]
     return bag
 
 
-def topic_bag(topic: TopicPage) -> Counter[str]:
+def topic_bag(topic: TopicPage, source: str = DEFAULT_TOPIC_TEXT) -> Counter[str]:
     return _weighted({"title": topic.title, "keywords": " ".join(topic.keywords),
-                      "compendium": topic.compendium, "description": topic.description},
-                     TOPIC_FIELDS)
+                      "text": " ".join(topic_texts(topic, source)[0])}, TOPIC_FIELDS)
 
 
 def item_bag(item: Item) -> Counter[str]:
@@ -125,9 +125,10 @@ class TextStatsReranker:
     name = "Textstatistik (Zeichen-n-Gramme, TF-IDF, Fach)"
     default_threshold = 0.5
 
-    async def score_page(self, topic: TopicPage, items: list[Item]) -> list[float]:
+    async def score_page(self, topic: TopicPage, items: list[Item],
+                         source: str = DEFAULT_TOPIC_TEXT) -> list[float]:
         bags = [item_bag(i) for i in items]
-        query = topic_bag(topic)
+        query = topic_bag(topic, source)
         docs = [query, *bags]
         df: Counter[str] = Counter()
         for bag in docs:

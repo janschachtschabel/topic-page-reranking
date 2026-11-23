@@ -22,6 +22,9 @@ button:disabled{opacity:.6;cursor:wait}
 .opts{display:flex;flex-wrap:wrap;gap:.4rem 1.25rem;margin-top:.75rem;color:var(--muted);font-size:.9rem}
 .opts label{display:flex;gap:.35rem;align-items:center}
 select,.opts input[type=password]{font:inherit;padding:.2rem .4rem;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--ink)}
+.examples{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.75rem;color:var(--muted);font-size:.9rem}
+.examples button{background:var(--card);color:var(--accent);border:1px solid var(--accent);font-weight:600;font-size:.85rem;padding:.3rem .7rem}
+.used{display:inline-block;font-size:.75rem;color:var(--keep);border:1px solid var(--keep);border-radius:3px;padding:0 .35rem;margin-left:.4rem;vertical-align:middle}
 .history{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.75rem}
 .history button{background:var(--lane);color:var(--ink);font-weight:400;font-size:.85rem;padding:.25rem .6rem}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -39,11 +42,10 @@ form.find button{padding:.4rem .9rem}
 .tag.yes{color:var(--keep);border-color:var(--keep)}
 details.comp{max-width:48rem;margin:0 0 .75rem}
 details.comp summary{cursor:pointer;color:var(--muted)}
-details.comp p{white-space:pre-line;margin:.4rem 0 0}
+details.comp p{white-space:pre-line;margin:.4rem 0 0;border-left:3px solid var(--ink);padding:.2rem 0 .2rem 1rem}
 header.topic{padding:2rem 0 1rem}
 h1{font:600 2rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 .75rem}
 h1 a{color:inherit;text-underline-offset:.2em;text-decoration-thickness:1px}
-.yardstick{max-width:48rem;border-left:3px solid var(--ink);padding:.2rem 0 .2rem 1rem;margin:0 0 .75rem;white-space:pre-line}
 .small{color:var(--muted);font-size:.9rem;margin:.25rem 0}
 .cut{display:flex;align-items:center;gap:.75rem;margin:1rem 0 0;flex-wrap:wrap}
 .cut input{width:14rem;accent-color:var(--accent)}
@@ -80,10 +82,22 @@ footer{color:var(--muted);font-size:.85rem;padding:2rem 0}
 <div class="wrap">
 <form id="f">
   <div class="ask">
-    <input id="url" type="text" required placeholder="z. B. https://wordpress.staging.openeduhub.net/portal/physik-optik/ oder eine Sammlungs-ID" aria-label="URL der Themenseite">
+    <input id="url" type="text" required value="https://wordpress.staging.openeduhub.net/portal/physik-optik/" placeholder="URL der Themenseite oder Sammlungs-ID" aria-label="URL der Themenseite">
     <button id="go" type="submit">Prüfen</button>
   </div>
+  <div class="examples" aria-label="Beispiele">
+    <span>Beispiele:</span>
+    <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/physik-optik/">Physik: Optik</button>
+    <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/mathematik-r%c3%a4umliche-und-ebene-geometrie/">Mathematik: Räumliche und ebene Geometrie</button>
+    <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/informatik-technische-informatik/">Informatik: Technische Informatik</button>
+  </div>
   <div class="opts">
+    <label>Abgleich mit
+      <select id="topictext">
+        <option value="description" selected>Beschreibung der Themenseite</option>
+        <option value="compendium">kompendialem Text</option>
+        <option value="both">beidem</option>
+      </select></label>
     <label><input type="checkbox" id="searches" checked> gespeicherte Suchen annähern</label>
     <label><input type="checkbox" id="subs" checked> Unterthemen einbeziehen</label>
     <label id="pwbox" hidden>Passwort <input type="password" id="pw" autocomplete="current-password"></label>
@@ -182,6 +196,31 @@ function lane(l, cut) {
   return sec;
 }
 
+const TEXT_NAMES = {description: "Beschreibung", compendium: "kompendialer Text"};
+
+// Both texts are shown; the one the materials were measured against is marked
+// and open, the other folded -- the compendium can run to many paragraphs.
+function topicTexts(t, choice) {
+  const used = choice.used === "both" ? ["description", "compendium"] : [choice.used];
+  const out = [];
+  if (choice.used !== choice.chosen && choice.chosen !== "both") {
+    out.push(el("p", {class: "small"},
+      `Kein Text „${TEXT_NAMES[choice.chosen]}“ hinterlegt – ` +
+      (choice.used === "none" ? "gemessen wird nur an Titel und Schlagworten."
+                              : `stattdessen ${TEXT_NAMES[choice.used] || "beides"} genutzt.`)));
+  }
+  for (const key of ["description", "compendium"]) {
+    const text = t[key];
+    const mark = used.includes(key) ? el("span", {class: "used"}, "für den Abgleich genutzt") : null;
+    if (!text) { out.push(el("p", {class: "small"}, `Kein Text „${TEXT_NAMES[key]}“ hinterlegt.`)); continue; }
+    const attrs = {class: "comp"};
+    if (used.includes(key)) attrs.open = "";
+    out.push(el("details", attrs, el("summary", {}, key === "description" ? "Beschreibung" : "Kompendialer Text", mark),
+                el("p", {}, text)));
+  }
+  return out;
+}
+
 function draw() {
   const cut = Number($("cut")?.value ?? data.threshold);
   const t = data.topic;
@@ -193,11 +232,7 @@ function draw() {
   slider.oninput = draw;
   const head = el("header", {class: "topic"},
     el("h1", {}, link(t.title, t.url)),
-    t.description ? el("p", {class: "yardstick"}, t.description)
-                  : el("p", {class: "yardstick"}, el("em", {}, "Kein Beschreibungstext hinterlegt.")),
-    t.compendium ? el("details", {class: "comp", open: ""}, el("summary", {}, "Kompendialer Text"),
-                      el("p", {}, t.compendium))
-                 : el("p", {class: "small"}, "Kein kompendialer Text hinterlegt."),
+    ...topicTexts(t, data.topic_text),
     t.keywords.length ? el("p", {class: "small"}, "Schlagworte: " + t.keywords.join(", ")) : null,
     el("div", {class: "cut"}, el("span", {}, el("strong", {}, `${misfits} von ${all.length}`), " Inhalten passen nicht zum Thema"),
       el("label", {}, "Schwelle ", slider, " ", el("strong", {}, cut.toFixed(2)))),
@@ -220,6 +255,9 @@ function offerChoices(message, choices, original) {
 }
 
 $("f").onsubmit = ev => { ev.preventDefault(); run($("url").value.trim()); };
+for (const b of document.querySelectorAll(".examples button")) {
+  b.onclick = () => { $("url").value = b.dataset.url; run(b.dataset.url); };
+}
 
 function mark(value, yes, no) {
   if (value === null || value === undefined) return el("span", {class: "tag", title: "Dieser Treffer kam ohne Eigenschaften – unbekannt"}, yes + " ?");
@@ -267,7 +305,7 @@ async function run(url, label = url) {
     const res = await fetch("/api/analyze", {
       method: "POST",
       headers: {"Content-Type": "application/json", "X-Demo-Password": $("pw").value},
-      body: JSON.stringify({url, subcollections: $("subs").checked,
+      body: JSON.stringify({url, topic_text: $("topictext").value, subcollections: $("subs").checked,
                             run_searches: $("searches").checked}),
     });
     const body = await res.json().catch(() => ({error: `Antwort ohne JSON (HTTP ${res.status}).`}));

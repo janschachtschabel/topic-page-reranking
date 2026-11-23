@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Literal
 
 # The package lives next to api/, not on the function's import path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -43,6 +44,7 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 class Request(BaseModel):
     url: str = Field(max_length=2000)
+    topic_text: Literal["description", "compendium", "both"] = "description"
     subcollections: bool = True
     run_searches: bool = True
     max_items: int = Field(default=400, ge=1, le=600)
@@ -124,9 +126,10 @@ async def analyze(body: Request, x_demo_password: str = Header(default="")):
                                           include_subcollections=body.subcollections,
                                           run_searches=body.run_searches)
             reranker = TextStatsReranker()
-            scored = await rerank(topic, reranker)
+            scored = await rerank(topic, reranker, source=body.topic_text)
             return page_as_json(topic, scored, backend=reranker.name,
-                                threshold=reranker.default_threshold, repository=repo.url)
+                                threshold=reranker.default_threshold, repository=repo.url,
+                                topic_text=body.topic_text)
     except NotFoundError:
         return _error(404, f"Keine Sammlung mit der ID {collection_id or '?'} gefunden.")
     except EduSharingError as exc:

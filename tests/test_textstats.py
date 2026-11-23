@@ -93,12 +93,17 @@ OPTIK = TopicPage(
     subjects=P)
 
 
-def test_example_page_guard():
-    scored = asyncio.run(rerank(OPTIK, TextStatsReranker()))
+def _example(source):
+    scored = asyncio.run(rerank(OPTIK, TextStatsReranker(), source=source))
     fits = {i.id: f for i, f in EXAMPLE}
     pos = [s.score for s in scored if fits[s.item.id]]
     neg = [s.score for s in scored if not fits[s.item.id]]
     auc = sum((p > n) + 0.5 * (p == n) for p in pos for n in neg) / (len(pos) * len(neg))
+    return scored, fits, auc
+
+
+def test_example_page_guard_compendium():
+    scored, fits, auc = _example("compendium")
     assert auc >= 0.95                                       # measured 0.97
     assert all(s.keep for s in scored if fits[s.item.id])   # no fitting material dropped
     # Every other-subject misfit is dropped; same-subject ones (mechanics,
@@ -106,3 +111,20 @@ def test_example_page_guard():
     # cannot reliably tell apart -- measured: they stay.
     other = {"12", "13", "14", "17"}
     assert all(not s.keep for s in scored if s.item.id in other)
+
+
+def test_example_page_guard_description():
+    # The example's description is generic portal text ("Hier findest du ...
+    # Material für Physik"): measured against it alone, the ranking is weaker
+    # (AUC 0.92 vs 0.97) -- title and keywords carry it. A specific
+    # description would do better; this guards the generic case.
+    scored, fits, auc = _example("description")
+    assert auc >= 0.9
+    other = {"12", "13", "14", "17"}
+    assert all(not s.keep for s in scored if s.item.id in other)
+
+
+def test_source_changes_what_is_measured():
+    texts = {src: asyncio.run(TextStatsReranker().score_page(OPTIK, list(OPTIK.items), src))
+             for src in ("description", "compendium", "both")}
+    assert texts["description"] != texts["compendium"]

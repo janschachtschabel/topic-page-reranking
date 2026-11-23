@@ -1,8 +1,7 @@
 """Relate each material to the topic it is shown under, and decide what stays.
 
-The query side is the topic page itself: title, description, keywords and the
-compendium text -- the last two parts say what the editors mean by the topic;
-a portal description is often generic ("Hier findest du ... Material für Physik").
+The query side is the topic page itself: title, keywords and -- selectable --
+its description, its compendium text, or both (``TOPIC_TEXTS``).
 The document side is what a material says about itself. A reranker scores each
 pair; everything at or above the threshold is kept.
 """
@@ -40,14 +39,39 @@ class Scored:
     original_rank: int
 
 
-def topic_query(topic: TopicPage) -> str:
+#: Which text of the topic page the materials are measured against. The
+#: description is the default: short and written for the page. The compendium
+#: text is longer and broader -- more vocabulary, also more that is not the topic.
+TOPIC_TEXTS = ("description", "compendium", "both")
+DEFAULT_TOPIC_TEXT = "description"
+
+
+def topic_texts(topic: TopicPage, source: str = DEFAULT_TOPIC_TEXT) -> tuple[list[str], str]:
+    """The chosen texts, and which one was actually used.
+
+    When the chosen text is empty the other one stands in -- title and
+    keywords alone are too thin to measure against -- and the second value
+    says so, so the caller can show it.
+
+    Raises:
+        ValueError: for a source not in ``TOPIC_TEXTS``.
+    """
+    if source not in TOPIC_TEXTS:
+        raise ValueError(f"unknown topic text {source!r}, expected one of {TOPIC_TEXTS}")
+    available = {"description": topic.description, "compendium": topic.compendium}
+    wanted = ["description", "compendium"] if source == "both" else [source]
+    used = [name for name in wanted if available[name]]
+    if not used:
+        used = [name for name in ("description", "compendium") if available[name]]
+    label = "both" if len(used) == 2 else (used[0] if used else "none")
+    return [available[name] for name in used], label
+
+
+def topic_query(topic: TopicPage, source: str = DEFAULT_TOPIC_TEXT) -> str:
     parts = [f"Thema: {topic.title}"]
-    if topic.description:
-        parts.append(topic.description)
     if topic.keywords:
         parts.append("Schlagworte: " + ", ".join(topic.keywords))
-    if topic.compendium:
-        parts.append(topic.compendium)
+    parts.extend(topic_texts(topic, source)[0])
     return "\n".join(parts)[:_MAX_QUERY_CHARS]
 
 
@@ -62,8 +86,8 @@ def item_text(item: Item) -> str:
     return "\n".join(parts)[:_MAX_CHARS]
 
 
-async def rerank(topic: TopicPage, reranker: Reranker,
-                 threshold: float | None = None) -> list[Scored]:
+async def rerank(topic: TopicPage, reranker: Reranker, threshold: float | None = None,
+                 source: str = DEFAULT_TOPIC_TEXT) -> list[Scored]:
     """Score every item against the topic, best first.
 
     Ties keep the original page order, so two runs over the same page with the
@@ -73,9 +97,10 @@ async def rerank(topic: TopicPage, reranker: Reranker,
         return []
     cut = reranker.default_threshold if threshold is None else threshold
     if hasattr(reranker, "score_page"):  # needs the whole page, e.g. for IDF
-        scores = await reranker.score_page(topic, list(topic.items))
+        scores = await reranker.score_page(topic, list(topic.items), source)
     else:
-        scores = await reranker.score(topic_query(topic), [item_text(i) for i in topic.items])
+        scores = await reranker.score(topic_query(topic, source),
+                                      [item_text(i) for i in topic.items])
     if len(scores) != len(topic.items):
         raise RuntimeError(f"{reranker.name} returned {len(scores)} scores "
                            f"for {len(topic.items)} items")

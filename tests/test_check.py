@@ -143,7 +143,11 @@ def test_texts_carry_description_and_keywords():
     assert "Brechung und Linsen" in topic_query(topic)
     assert "Schlagworte: Licht, Linse" in topic_query(topic)
     assert topic.compendium == "Optik ist die Lehre vom Licht."
-    assert topic.compendium in topic_query(topic)
+    assert topic.compendium not in topic_query(topic)            # default: description
+    assert topic.compendium in topic_query(topic, "compendium")
+    assert "Brechung und Linsen" not in topic_query(topic, "compendium")
+    both = topic_query(topic, "both")
+    assert topic.compendium in both and "Brechung und Linsen" in both
     text = item_text(topic.items[0])
     assert "Reflexion am Spiegel" in text and "Schlagworte: Spiegel" in text and "Fach: Physik" in text
 
@@ -176,3 +180,17 @@ def test_report_escapes_and_shows_both_sides():
     assert "javascript:" not in html
     assert "1 von 2</strong>" in html
     assert "Nach Reranking (1)" in html and "Aussortiert (1)" in html
+
+
+
+def test_topic_texts_fall_back_and_say_so():
+    from themenseiten_check.collect import TopicPage
+    from themenseiten_check.scoring import topic_texts
+    full = TopicPage("t", "T", "kurz", (), "", (), compendium="lang")
+    assert topic_texts(full) == (["kurz"], "description")
+    assert topic_texts(full, "both") == (["kurz", "lang"], "both")
+    only_comp = TopicPage("t", "T", "", (), "", (), compendium="lang")
+    assert topic_texts(only_comp, "description") == (["lang"], "compendium")
+    assert topic_texts(TopicPage("t", "T", "", (), "", ()), "both") == ([], "none")
+    with pytest.raises(ValueError):
+        topic_texts(full, "x")

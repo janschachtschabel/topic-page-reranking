@@ -121,6 +121,11 @@ def test_endpoint_scores_with_text_statistics(monkeypatch):
     items = res.json()["items"]
     assert items["a"]["score"] > items["b"]["score"]
     assert res.json()["backend"].startswith("Textstatistik")
+    assert res.json()["topic_text"] == {"chosen": "description", "used": "description"}
+    res = TestClient(mod.app).post("/api/analyze", json={"url": ID, "topic_text": "compendium"})
+    assert res.json()["topic_text"] == {"chosen": "compendium", "used": "description"}  # none: stand-in
+    assert TestClient(mod.app).post("/api/analyze",
+                                    json={"url": ID, "topic_text": "x"}).status_code == 422
 
 
 def test_config_reports_password(monkeypatch):

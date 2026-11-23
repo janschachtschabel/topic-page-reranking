@@ -19,7 +19,7 @@ from edusharing import AsyncRepository, EduSharingError
 from .backends import DEFAULT_CROSS_ENCODER, CrossEncoderReranker
 from .collect import load_topic_page
 from .report import render
-from .scoring import rerank
+from .scoring import DEFAULT_TOPIC_TEXT, TOPIC_TEXTS, rerank
 from .search import find_topic_pages
 from .textstats import TextStatsReranker
 
@@ -34,6 +34,8 @@ def _args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--subject", default="", help="Fach für --search, z. B. Physik")
     p.add_argument("--backend", choices=("textstats", "local"), default="textstats")
     p.add_argument("--model", help=f"nur für --backend local, Vorgabe {DEFAULT_CROSS_ENCODER}")
+    p.add_argument("--topic-text", choices=TOPIC_TEXTS, default=DEFAULT_TOPIC_TEXT,
+                   help="Woran gemessen wird: Beschreibung, kompendialer Text oder beides")
     p.add_argument("--threshold", type=float, help="Mindestscore für 'passend' (Vorgabe je Backend)")
     p.add_argument("--max-items", type=int, default=200)
     p.add_argument("--subcollections", action="store_true", help="Inhalte direkter Untersammlungen einbeziehen")
@@ -86,7 +88,7 @@ async def _run(args: argparse.Namespace) -> int:
                                       run_searches=args.searches)
         print(f"{topic.title}: {len(topic.items)} Inhalte geladen", file=sys.stderr)
         threshold = reranker.default_threshold if args.threshold is None else args.threshold
-        scored = await rerank(topic, reranker, threshold)
+        scored = await rerank(topic, reranker, threshold, source=args.topic_text)
 
         out = args.out or Path("reports") / f"{topic.id}.html"
         out.parent.mkdir(parents=True, exist_ok=True)

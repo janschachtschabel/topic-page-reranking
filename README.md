@@ -30,7 +30,17 @@ die Kandidaten zur Auswahl an, statt zu raten. Abgerufen werden nur Seiten von
 werden bei jedem Schritt erneut geprüft. Edu-sharing-URLs und IDs werden nicht
 abgerufen, nur gelesen.
 
-Anzeige: Kopf mit Titel, Beschreibung, **kompendialem Text** und
+Vorausgefüllt ist die Optik-Seite; drei Beispiel-Knöpfe (Physik: Optik,
+Mathematik: Räumliche und ebene Geometrie, Informatik: Technische Informatik)
+prüfen mit einem Klick.
+
+**Woran gemessen wird, ist wählbar:** an der **Beschreibung der Themenseite**
+(Standard, kürzer), am **kompendialen Text** oder an **beidem** – jeweils
+zusammen mit Titel und Schlagworten. Fehlt der gewählte Text, springt der andere
+ein, und die Seite sagt das. Im Kopf stehen beide Texte; der genutzte ist
+markiert und aufgeklappt. Kommandozeile: `--topic-text description|compendium|both`.
+
+Anzeige: Kopf mit Titel, Beschreibung, kompendialem Text und
 Schlagworten, darunter jede
 Schwimmlinie der Seite mit zwei Spalten – **Ist-Stand** in Seitenreihenfolge
 (unpassende rot durchgestrichen) und **Nach Reranking** nach Score, mit
@@ -51,7 +61,7 @@ Text sagt, was das Thema ist.
 Bewertung – kostenfrei, ohne Schlüssel und ohne Modell, per **Textstatistik**:
 
 * **Zeichen-n-Gramme (4 und 5 Zeichen) mit TF-IDF**: Thema (Titel ×3,
-  Schlagworte ×2, kompendialer Text ×1,5, Beschreibung ×0,5) und Material
+  Schlagworte ×2, gewählter Text ×1,5) und Material
   (Titel ×2, Schlagworte ×1,5, Beschreibung ×1) werden als Vektoren verglichen,
   die Wortgewichte aus allen Inhalten der Seite. n-Gramme statt ganzer Wörter
   wegen deutscher Komposita und Beugung: „Linsen“ und „Sammellinse“ teilen kein
@@ -68,8 +78,10 @@ Stoppwörter ignorieren. Nicht übernommen: den Bonus für Metadatenqualität
 ist, nicht, ob er zum Thema gehört.
 
 Wie gut das ist: Auf einer selbst gebauten Beispielseite (Optik, 11 passende,
-7 unpassende Materialien, `tests/test_textstats.py`) liegt die Reihung bei
-AUC 0,97; alle passenden bleiben, alle fachfremden fallen heraus. Fachgleiche
+7 unpassende Materialien, `tests/test_textstats.py`) liegt die Reihung gegen den
+kompendialen Text bei AUC 0,97 (alle passenden bleiben, alle fachfremden fallen
+heraus), gegen eine allgemeine Portal-Beschreibung („Hier findest du …
+Material für Physik“) bei 0,92 – dann tragen Titel und Schlagworte fast allein. Fachgleiche
 Fehlzuordnungen (Mechanik, Akustik auf der Optik-Seite) bleiben dagegen über der
 Schwelle – dafür reicht Wortstatistik nicht. Die Beispielseite ist klein und für
 diesen Zweck geschrieben; die Zahl ist ein Wächter gegen Verschlechterung, kein

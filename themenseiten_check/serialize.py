@@ -9,11 +9,12 @@ from __future__ import annotations
 from typing import Any
 
 from .collect import TopicPage
-from .scoring import Scored
+from .scoring import DEFAULT_TOPIC_TEXT, Scored, topic_texts
 
 
 def page_as_json(topic: TopicPage, scored: list[Scored], *, backend: str,
-                 threshold: float, repository: str) -> dict[str, Any]:
+                 threshold: float, repository: str,
+                 topic_text: str = DEFAULT_TOPIC_TEXT) -> dict[str, Any]:
     by_id = {s.item.id: s for s in scored}
     return {
         "topic": {"id": topic.id, "title": topic.title, "description": topic.description,
@@ -31,6 +32,9 @@ def page_as_json(topic: TopicPage, scored: list[Scored], *, backend: str,
                   for lane in topic.lanes],
         "notes": list(topic.notes),
         "backend": backend,
+        # What was asked for, and what was used -- they differ when the
+        # chosen text is empty and the other one stood in.
+        "topic_text": {"chosen": topic_text, "used": topic_texts(topic, topic_text)[1]},
         "threshold": threshold,
         "repository": repository,
     }
