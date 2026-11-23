@@ -43,10 +43,11 @@ was die Themenseite als Intro über den Schwimmlinien zeigt –, zuletzt
 Überschriftenzeichen und Links werden vor Anzeige und Abgleich entfernt.
 
 **Woran gemessen wird, ist wählbar:** an der **Beschreibung der Themenseite**
-(Standard, kürzer), am **kompendialen Text** oder an **beidem** – jeweils
+(Standard, kürzer), an den **Überschriften des kompendialen Texts**, am
+**kompendialen Text** oder an **Beschreibung und kompendialem Text** – jeweils
 zusammen mit Titel und Schlagworten. Fehlt der gewählte Text, springt der andere
 ein, und die Seite sagt das. Im Kopf stehen beide Texte; der genutzte ist
-markiert und aufgeklappt. Kommandozeile: `--topic-text description|compendium|both`.
+markiert und aufgeklappt. Kommandozeile: `--topic-text description|headings|compendium|both`.
 
 Anzeige: Kopf mit Titel, Beschreibung, kompendialem Text und
 Schlagworten, darunter jede
@@ -74,30 +75,80 @@ Bewertung – kostenfrei, ohne Schlüssel und ohne Modell, per **Textstatistik**
   die Wortgewichte aus allen Inhalten der Seite. n-Gramme statt ganzer Wörter
   wegen deutscher Komposita und Beugung: „Linsen“ und „Sammellinse“ teilen kein
   Wort, aber „lins“, „inse“, „linse“.
+* **Seitenzusammenhalt**: Jedes Material wird außerdem mit allen *anderen*
+  Materialien der Seite zusammen verglichen. Fehlzuordnungen sind Ausreißer
+  unter ihren Nachbarn, auch wenn sie mit dem Thementext Wörter teilen. Der Score
+  ist je zur Hälfte Themennähe und Zusammenhalt, beide relativ zum Median der
+  Seite (1,0 = so nah wie ein typischer Inhalt dieser Seite).
 * **Fachabgleich**: Ein Material, dessen Fächer keines mit der Themenseite
   teilen (Mathematik auf der Optik-Seite), bekommt höchstens 0,4.
-* **Skala**: 1,0 heißt „so nah am Thema wie ein typischer Inhalt dieser Seite“
-  (Median), Standardschwelle 0,5. Die Annahme dahinter: Der Großteil einer Seite
-  passt. Ohne Modell gibt es keinen absoluten Maßstab.
+* **Schwelle 0,60** als Ausgangswert. Die Annahme dahinter: Der Großteil einer
+  Seite passt. Ohne Modell gibt es keinen absoluten Maßstab.
 
 Aus dem Reranker von wlo-mcp-sc übernommen: Felder unterschiedlich gewichten,
 Stoppwörter ignorieren. Nicht übernommen: den Bonus für Metadatenqualität
 (Lizenz, Vorschaubild, Herausgeber) – er bewertet, ob ein Datensatz gut gepflegt
 ist, nicht, ob er zum Thema gehört.
 
-Wie gut das ist: Auf einer selbst gebauten Beispielseite (Optik, 11 passende,
-7 unpassende Materialien, `tests/test_textstats.py`) liegt die Reihung gegen den
-kompendialen Text bei AUC 0,97 (alle passenden bleiben, alle fachfremden fallen
-heraus), gegen eine allgemeine Portal-Beschreibung („Hier findest du …
-Material für Physik“) bei 0,92 – dann tragen Titel und Schlagworte fast allein. Fachgleiche
-Fehlzuordnungen (Mechanik, Akustik auf der Optik-Seite) bleiben dagegen über der
-Schwelle – dafür reicht Wortstatistik nicht. Die Beispielseite ist klein und für
-diesen Zweck geschrieben; die Zahl ist ein Wächter gegen Verschlechterung, kein
-Qualitätsnachweis. Ausprobiert und verworfen: 3-Gramme, Endungen abschneiden,
-Unterthemen-Titel als Themenvokabular – alle drei verschlechterten die Reihung.
+**Abgestimmt** auf drei selbst geschriebene Beispielseiten (`tests/eval_pages.py`:
+Optik, Räumliche und ebene Geometrie, Technische Informatik; je 10–12 passende,
+6 unpassende Materialien, darunter fachgleiche wie Mechanik auf der Optik-Seite):
 
-Der Cross-Encoder der Kommandozeile (lokal, ebenfalls kostenfrei) läuft auf
-Vercel nicht: torch sprengt die Funktionsgröße.
+| Variante, gegen die Beschreibung | Reihung (AUC, Mittel) | bestes F1 für Unpassendes |
+|---|---|---|
+| nur Themennähe | 0,975 | 0,89 bei 0,40 |
+| Themennähe und Zusammenhalt je zur Hälfte | **1,00** | **0,97 bei 0,60** |
+| Zusammenhalt überwiegt (0,3 / 0,7) | 0,96 | 0,87 bei 0,75 |
+
+Mit Schwelle 0,60 bleiben alle 33 passenden Materialien, 17 von 18 unpassenden
+fallen heraus (übrig bleibt „Elektrischer Stromkreis“ auf Optik, 0,61). Gegen
+den vollständigen kompendialen Text ist die Reihung schwächer (AUC 0,965).
+Der Abstand an der Schwelle ist knapp, und die Seiten sind klein und für diesen
+Zweck geschrieben: Die Zahlen vergleichen Varianten, sie belegen keine Qualität
+auf echten Seiten. Ausprobiert und verworfen: 3-Gramme, Endungen abschneiden,
+Unterthemen-Titel als Themenvokabular.
+
+**Auf echten Seiten einstellen:** Jeder Inhalt hat die Knöpfe „passt“ und
+„passt nicht“. Die Markierungen bleiben je Themenseite im Browser; die Leiste
+oben zeigt dann die Reihungsgüte (AUC), wie viele unpassende die aktuelle
+Schwelle erkennt und wie viele passende sie fälschlich aussortiert, schlägt die
+Schwelle vor, die die Markierungen am besten trennt, und exportiert sie als
+JSON – Grundlage, um Schwelle und Gewichte an echten Seiten nachzustellen.
+
+### Alternative: kleiner Cross-Encoder (ONNX, int8)
+
+Unter „Optionen → Verfahren“ lässt sich statt der Textstatistik ein
+Cross-Encoder wählen: `cross-encoder/msmarco-MiniLM-L12-en-de-v1` (Deutsch/
+Englisch), int8-quantisiert und als ONNX ausgeliefert, ohne torch. Er bewertet
+jedes Paar (Thema, Material) zusammen und liest davon höchstens 256 Token; der
+Thementext wird auf 96 Token gekürzt. Für ihn eignen sich die **Beschreibung**
+oder die **Überschriften des kompendialen Texts** (h1–h3, ohne Inhaltsverzeichnis,
+Dokumenttitel, „Teil 1 …“ und die nummerierten Schema-Abschnitte); vom
+vollständigen kompendialen Text sähe er nur die ersten Zeilen, die Seite weist
+darauf hin. Scores werden wie bei der Textstatistik auf den Median der Seite
+bezogen, Fachfremdes ×0,4. Die Schwelle 0,5 ist **nicht kalibriert** – das echte
+Modell lief beim Schreiben nirgends; „passt / passt nicht“ markieren und den
+Vorschlag übernehmen.
+
+**Modell ins Repository bringen** – kein Git LFS nötig: GitHub lehnt Dateien
+über 100 MiB ab, das Modell ist auch in int8 rund 118 MB (96 MB davon das
+mehrsprachige Vokabular). `scripts/prepare_model.py` lädt es von Hugging Face,
+quantisiert es dynamisch auf int8 und schreibt die Gewichte als ONNX-„external
+data“ in Teildateien `weights-NN.bin` unter 95 MiB (ASCII-Namen, damit ein
+Windows-Checkout sie anlegen kann); `manifest.json` hält Quelle, Revision,
+Prüfsummen und einen fp32-gegen-int8-Vergleich fest.
+
+Am einfachsten über GitHub: **Actions → „Modell vorbereiten“ → Run workflow**.
+Die Action baut `model/` und committet es; Vercel deployt danach von selbst.
+Lokal geht es mit `pip install -r scripts/requirements-model.txt` und
+`python scripts/prepare_model.py`. Ohne `model/` ist der Cross-Encoder in der
+App ausgegraut und nennt den Grund.
+
+Größe auf Vercel: Modell ~118 MB plus onnxruntime, tokenizers, numpy (~160 MB)
+und die übrigen Pakete – unter den 500 MB, die Vercel Python-Funktionen
+erlaubt. Der erste Aufruf einer Instanz lädt das Modell (einige Sekunden),
+danach bleibt es im Speicher. Lokal ohne ONNX: `--backend local` nutzt
+sentence-transformers mit `BAAI/bge-reranker-v2-m3`.
 
 ### Deployen
 
@@ -141,7 +192,8 @@ themenseiten-check <sammlungs-id> --backend local  # Cross-Encoder
 
 | Option | Bedeutung |
 |---|---|
-| `--backend textstats` | Textstatistik wie in der Web-App (Schwelle 0.50). Standard. |
+| `--backend textstats` | Textstatistik wie in der Web-App (Schwelle 0.60). Standard. |
+| `--backend onnx` | mitgelieferter int8-Cross-Encoder aus `model/`. |
 | `--backend local` | Cross-Encoder `BAAI/bge-reranker-v2-m3` (mehrsprachig, lokal, kostenfrei, Score 0–1, Schwelle 0.30). |
 | `--searches` | gespeicherte Suchen der Widgets angenähert ausführen |
 | `--model` | anderes Modell für `--backend local` |
@@ -181,7 +233,9 @@ unter den Hinweisen.
 | `search.py` | Themenseiten über die Sammlungssuche finden |
 | `scoring.py` | Abfrage- und Dokumenttext bauen, sortieren, Schwelle anwenden |
 | `textstats.py` | Textstatistik: n-Gramme, TF-IDF, Fachabgleich |
-| `backends.py` | lokaler Cross-Encoder |
+| `backends.py` | lokaler Cross-Encoder (sentence-transformers) |
+| `onnx_reranker.py` | int8-Cross-Encoder aus `model/` (ONNX Runtime) |
+| `scripts/prepare_model.py` | Modell laden, quantisieren, in Teile unter 100 MiB schreiben |
 | `report.py` | HTML-Bericht der Kommandozeile |
 | `cli.py` | Kommandozeile |
 | `api/index.py` | Vercel-Funktion: `POST /api/analyze`, `POST /api/search` |

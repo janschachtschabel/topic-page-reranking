@@ -31,6 +31,7 @@ from themenseiten_check.collect import load_topic_page  # noqa: E402
 from themenseiten_check.scoring import rerank  # noqa: E402
 from themenseiten_check.search import find_topic_pages  # noqa: E402
 from themenseiten_check.serialize import page_as_json  # noqa: E402
+from themenseiten_check.onnx_reranker import OnnxCrossEncoder, unavailable  # noqa: E402
 from themenseiten_check.textstats import TextStatsReranker  # noqa: E402
 from themenseiten_check.portal import DEFAULT_HOSTS, NeedsChoice, resolve  # noqa: E402
 
@@ -44,7 +45,8 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 class Request(BaseModel):
     url: str = Field(max_length=2000)
-    topic_text: Literal["description", "compendium", "both"] = "description"
+    topic_text: Literal["description", "headings", "compendium", "both"] = "description"
+    backend: Literal["textstats", "crossencoder"] = "textstats"
     subcollections: bool = True
     run_searches: bool = True
     max_items: int = Field(default=400, ge=1, le=600)
@@ -94,7 +96,9 @@ async def index():
 @app.get("/api/config")
 async def config():
     """What the page needs to know before the first request."""
-    return {"password": bool(os.environ.get("DEMO_PASSWORD"))}
+    reason = unavailable()
+    return {"password": bool(os.environ.get("DEMO_PASSWORD")),
+            "crossencoder": {"available": not reason, "reason": reason}}
 
 
 @app.post("/api/search")
@@ -125,7 +129,13 @@ async def analyze(body: Request, x_demo_password: str = Header(default="")):
             topic = await load_topic_page(repo, collection_id, max_items=body.max_items,
                                           include_subcollections=body.subcollections,
                                           run_searches=body.run_searches)
-            reranker = TextStatsReranker()
+            if body.backend == "crossencoder":
+                reason = unavailable()
+                if reason:
+                    return _error(503, f"Cross-Encoder nicht verfügbar: {reason}")
+                reranker = OnnxCrossEncoder()
+            else:
+                reranker = TextStatsReranker()
             scored = await rerank(topic, reranker, source=body.topic_text)
             return page_as_json(topic, scored, backend=reranker.name,
                                 threshold=reranker.default_threshold, repository=repo.url,

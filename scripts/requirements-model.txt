@@ -1,0 +1,8 @@
+# Build time only: preparing model/ (scripts/prepare_model.py). Not on Vercel.
+onnx>=1.16,<2
+onnxruntime>=1.18,<2
+tokenizers>=0.19,<1
+huggingface_hub>=0.23,<2
+numpy>=1.26,<3
+# Only if the model repository has no onnx/model.onnx to start from:
+#   pip install "optimum[onnxruntime]" torch --extra-index-url https://download.pytorch.org/whl/cpu

@@ -23,7 +23,7 @@ from typing import Any
 from edusharing import AsyncRepository, EduSharingError
 
 from .saved_search import run_saved_search
-from .topic_text import description_of, plain_text
+from .topic_text import description_of, headings, plain_text
 
 KEYWORD_PROP = "cclom:general_keyword"
 #: Page size for collection listings and describe_many (its own cap is 50).
@@ -73,6 +73,9 @@ class TopicPage:
     #: WLO) -- usually far more telling about the topic than the description.
     #: Read from the metadata profile, so another metadata set can name its own.
     compendium: str = ""
+    #: The h1-h3 headings of the compendium text, scaffolding removed -- the
+    #: short form of the topic for a model that cannot read the whole text.
+    compendium_headings: tuple[str, ...] = ()
     #: Where the description was found -- shown, so it can be checked against
     #: other tools reading the same collection. Empty when none was found.
     description_source: str = ""
@@ -96,12 +99,12 @@ def _item(raw: dict[str, Any], source: str) -> Item:
 
 
 def _compendium(repo: AsyncRepository, meta: dict[str, Any]) -> str:
-    """The compendium text from an already fetched description, if the profile names one."""
+    """The raw compendium text (Markdown) from an already fetched description."""
     prop = repo.metadata_profile.compendium_property
     value = (meta.get("properties") or {}).get(prop) if prop else None
     if isinstance(value, list):
         value = value[0] if value else None
-    return plain_text(value) if isinstance(value, str) else ""
+    return value if isinstance(value, str) else ""
 
 
 class _Builder:
@@ -247,11 +250,13 @@ async def load_topic_page(repo: AsyncRepository, collection_id: str, *,
         # WordPress, not in the repository, and this is where to look next.
         builder.notes.append("Keine Beschreibung im Repositorium gefunden (geprüft: "
                              "cclom:general_description, collection.description, cm:description).")
+    compendium = _compendium(repo, meta)
     return TopicPage(
         id=meta["id"], title=meta["title"],
         description=description, description_source=source,
         keywords=tuple(meta.get("keywords") or ()), url=meta.get("url") or "",
-        compendium=_compendium(repo, meta),
+        compendium=plain_text(compendium),
+        compendium_headings=tuple(headings(compendium)),
         subjects=tuple((meta.get("fields") or {}).get("subject") or ()),
         items=tuple(builder.items.values()), lanes=tuple(builder.lanes),
         notes=tuple(builder.notes))

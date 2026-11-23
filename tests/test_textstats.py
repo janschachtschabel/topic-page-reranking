@@ -1,8 +1,8 @@
 """Text statistics: the building blocks, and one example page as a guard.
 
-The example set is small and was written for this purpose, so the numbers
-below are a regression guard, not evidence of quality on real pages: if a
-change makes them worse, look again; that they pass says little more.
+The example pages (``eval_pages.py``) are small and written for this purpose,
+so the numbers below are a regression guard, not evidence of quality on real
+pages: if a change makes them worse, look again; that they pass says little more.
 """
 
 import asyncio
@@ -11,6 +11,7 @@ import pytest
 
 from themenseiten_check.collect import Item, TopicPage
 from themenseiten_check.scoring import rerank
+from eval_pages import PAGES
 from themenseiten_check.textstats import (TextStatsReranker, cosine, ngrams, normalise,
                                           subjects_agree)
 
@@ -62,69 +63,54 @@ def test_disjoint_subject_caps_the_score():
     assert scores[1] <= 0.4 < scores[0]
 
 
-EXAMPLE = [
-    (item("1", "Sammellinse und Zerstreuungslinse", "Wie Linsen Lichtstrahlen bündeln oder streuen", ["Linsen"]), True),
-    (item("2", "Lichtbrechung am Wasserglas", "Ein einfacher Versuch zur Brechung", ["Brechung"]), True),
-    (item("3", "Regenbogen erklärt", "Dispersion: weißes Licht wird in Spektralfarben zerlegt"), True),
-    (item("4", "Totalreflexion im Lichtleiter", "Glasfaser und Grenzwinkel"), True),
-    (item("5", "Das menschliche Auge", "Aufbau, Netzhaut und Akkommodation", ["Auge"]), True),
-    (item("6", "Additive Farbmischung", "Rot, Grün und Blau ergeben Weiß", ["Farben"]), True),
-    (item("7", "Lochkamera selbst bauen", "Bastelanleitung, Bildentstehung"), True),
-    (item("8", "Spiegelbilder am ebenen Spiegel", "Reflexionsgesetz: Einfallswinkel gleich Ausfallswinkel", ["Reflexion"]), True),
-    (item("9", "Schatten und Halbschatten", "Kernschatten bei zwei Lichtquellen"), True),
-    (item("10", "Beugung am Doppelspalt", "Interferenzmuster von Laserlicht", ["Wellenoptik"]), True),
-    (item("11", "Linsengleichung üben", "Brennweite, Gegenstandsweite und Bildweite berechnen"), True),
-    (item("12", "Brüche kürzen und erweitern", "Arbeitsblatt Klasse 6", ["Bruchrechnung"], ("Mathematik",)), False),
-    (item("13", "Der Dreißigjährige Krieg", "Ursachen und Folgen", [], ("Geschichte",)), False),
-    (item("14", "Photosynthese", "Pflanzen nutzen Licht, um Zucker herzustellen", ["Licht"], ("Biologie",)), False),
-    (item("15", "Elektrischer Stromkreis", "Reihen- und Parallelschaltung", ["Strom"]), False),
-    (item("16", "Newtonsche Gesetze", "Kraft, Masse und Beschleunigung", ["Mechanik"]), False),
-    (item("17", "Bruchrechnen mit Pizza", "Anteile anschaulich", [], ("Mathematik",)), False),
-    (item("18", "Schall und Lautstärke", "Schallwellen und Frequenz", ["Akustik"]), False),
-]
-OPTIK = TopicPage(
-    "t", "Optik",
-    "Hier findest du zahlreiches kostenloses Material für Physik! Neben sorgfältig "
-    "ausgewählten Inhalten für jede Art von Unterricht findest du auch kurzweilige Inhalte.",
-    ("Licht", "Linse"), "", tuple(i for i, _ in EXAMPLE),
-    compendium="Die Optik ist das Teilgebiet der Physik, das sich mit dem Licht beschäftigt: "
-               "seiner Ausbreitung, Reflexion und Brechung, mit Linsen, Spiegeln und optischen "
-               "Geräten wie dem Auge, mit Farben sowie mit Beugung und Interferenz in der Wellenoptik.",
-    subjects=P)
-
-
-def _example(source):
-    scored = asyncio.run(rerank(OPTIK, TextStatsReranker(), source=source))
-    fits = {i.id: f for i, f in EXAMPLE}
+def _measure(topic, fits, source):
+    scored = asyncio.run(rerank(topic, TextStatsReranker(), source=source))
     pos = [s.score for s in scored if fits[s.item.id]]
     neg = [s.score for s in scored if not fits[s.item.id]]
     auc = sum((p > n) + 0.5 * (p == n) for p in pos for n in neg) / (len(pos) * len(neg))
-    return scored, fits, auc
+    return scored, auc
 
 
-def test_example_page_guard_compendium():
-    scored, fits, auc = _example("compendium")
-    assert auc >= 0.95                                       # measured 0.97
-    assert all(s.keep for s in scored if fits[s.item.id])   # no fitting material dropped
-    # Every other-subject misfit is dropped; same-subject ones (mechanics,
-    # electricity, acoustics on an optics page) are what text statistics
-    # cannot reliably tell apart -- measured: they stay.
-    other = {"12", "13", "14", "17"}
-    assert all(not s.keep for s in scored if s.item.id in other)
+@pytest.mark.parametrize("name", list(PAGES))
+def test_example_pages_with_description(name):
+    """Default setting: measured AUC 0.99-1.00, no fitting material dropped."""
+    topic, fits = PAGES[name]
+    scored, auc = _measure(topic, fits, "description")
+    assert auc >= 0.95
+    assert all(s.keep for s in scored if fits[s.item.id])
+    # Misfits of another subject are always dropped -- the subject cap alone does that.
+    assert all(not s.keep for s in scored
+               if not fits[s.item.id] and set(s.item.subjects) != set(topic.subjects))
 
 
-def test_example_page_guard_description():
-    # The example's description is generic portal text ("Hier findest du ...
-    # Material für Physik"): measured against it alone, the ranking is weaker
-    # (AUC 0.92 vs 0.97) -- title and keywords carry it. A specific
-    # description would do better; this guards the generic case.
-    scored, fits, auc = _example("description")
+def test_example_pages_find_most_misfits():
+    # Measured at the default threshold: 17 of 18 misfits across the three
+    # pages; the one kept is "Elektrischer Stromkreis" on Optik (0.61 vs 0.60).
+    found = total = 0
+    for topic, fits in PAGES.values():
+        scored, _ = _measure(topic, fits, "description")
+        found += sum(not s.keep for s in scored if not fits[s.item.id])
+        total += sum(not f for f in fits.values())
+    assert found >= total - 2
+
+
+@pytest.mark.parametrize("name", list(PAGES))
+def test_example_pages_with_compendium(name):
+    # The long compendium text is the weaker yardstick (measured mean AUC 0.965).
+    topic, fits = PAGES[name]
+    _, auc = _measure(topic, fits, "compendium")
     assert auc >= 0.9
-    other = {"12", "13", "14", "17"}
-    assert all(not s.keep for s in scored if s.item.id in other)
+
+
+def test_cohesion_singles_out_the_odd_one():
+    from themenseiten_check.textstats import cohesion
+    vecs = [{"a": 1.0}, {"a": 0.8, "b": 0.6}, {"a": 1.0}, {"z": 1.0}]
+    c = cohesion(vecs)
+    assert c[3] == 0.0 and min(c[:3]) > 0.5
 
 
 def test_source_changes_what_is_measured():
-    texts = {src: asyncio.run(TextStatsReranker().score_page(OPTIK, list(OPTIK.items), src))
-             for src in ("description", "compendium", "both")}
+    topic, _ = PAGES["Optik"]
+    texts = {src: asyncio.run(TextStatsReranker().score_page(topic, list(topic.items), src))
+             for src in ("description", "compendium")}
     assert texts["description"] != texts["compendium"]

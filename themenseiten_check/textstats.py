@@ -23,9 +23,10 @@ common misassignment and needs no text statistics to be seen; its score is
 multiplied by 0.4. Agreement adds nothing: "Physik" does not make a mechanics
 worksheet fit an optics page.
 
-The score is relative to the page's **median** similarity, capped at 1: 1.0
-means "as close to the topic as a typical material of this page", 0.5 "half as
-close". The median rather than the best hit (which wlo-mcp-sc normalises
+The score has two halves, each relative to the page's **median** and capped at
+1: closeness to the topic text, and **cohesion** -- closeness to all other
+materials of the page together. 1.0 means "as close as a typical material of
+this page". The median rather than the best hit (which wlo-mcp-sc normalises
 against) because one keyword-heavy outlier would otherwise squash every other
 score. The premise is that most of a page fits -- on a page where most does
 not, the scale shifts with it. That is the price of having no absolute
@@ -53,6 +54,10 @@ ITEM_FIELDS = {"title": 2.0, "keywords": 1.5, "description": 1.0}
 #: 4- and 5-grams: 3-grams ("ung", "ich") match across unrelated words and
 #: blurred the separation on the Optik example set (see tests).
 NGRAMS = (4, 5)
+#: Share of the topic similarity in the score; the rest is cohesion with the
+#: page. Equal shares scored best on the example pages (mean AUC 1.00 with the
+#: description, against 0.975 for topic similarity alone and 0.96 at 0.3).
+TOPIC_WEIGHT = 0.5
 #: Factor for a material whose subjects share none with the topic's.
 DISJOINT_SUBJECT = 0.4
 
@@ -119,11 +124,41 @@ def subjects_agree(topic: tuple[str, ...], item: tuple[str, ...]) -> float:
     return 1.0 if {normalise(s) for s in topic} & {normalise(s) for s in item} else 0.0
 
 
-class TextStatsReranker:
-    """Scores a whole page at once: IDF needs every material of it."""
+def cohesion(vecs: list[dict[str, float]]) -> list[float]:
+    """Each material's similarity to all the OTHER materials of the page together.
 
-    name = "Textstatistik (Zeichen-n-Gramme, TF-IDF, Fach)"
-    default_threshold = 0.5
+    The page's own consensus as a second yardstick: misassigned materials are
+    outliers among their neighbours even where they share words with the topic
+    text ("Elektrischer Stromkreis" and the optics description both say
+    "Physik"-ish things; the forty optics materials around it do not).
+    Leave-one-out, so a material does not vote for itself.
+    """
+    total: Counter[str] = Counter()
+    for vec in vecs:
+        total.update(vec)
+    out = []
+    for vec in vecs:
+        rest = {g: total[g] - vec.get(g, 0.0) for g in total}
+        norm = math.sqrt(sum(x * x for x in rest.values()))
+        out.append(sum(v * rest.get(g, 0.0) for g, v in vec.items()) / norm if norm else 0.0)
+    return out
+
+
+def _relative(values: list[float]) -> list[float]:
+    """Divide by the median of the positive values, cap at 1."""
+    typical = _median([x for x in values if x > 0]) or 1.0
+    return [min(1.0, x / typical) for x in values]
+
+
+class TextStatsReranker:
+    """Scores a whole page at once: IDF and cohesion need every material of it."""
+
+    name = "Textstatistik (Zeichen-n-Gramme, TF-IDF, Seitenzusammenhalt, Fach)"
+    #: Tuned on the example pages (tests/eval_pages.py): best mean F1 for
+    #: finding misfits at 0.60 with the description as topic text. The margin
+    #: there is narrow (lowest fit 0.65, highest misfit 0.61), so treat it as a
+    #: starting point and calibrate on marked real pages in the app.
+    default_threshold = 0.6
 
     async def score_page(self, topic: TopicPage, items: list[Item],
                          source: str = DEFAULT_TOPIC_TEXT) -> list[float]:
@@ -135,11 +170,12 @@ class TextStatsReranker:
             df.update(bag.keys())
         idf = {g: math.log((1 + len(docs)) / (1 + d)) + 1 for g, d in df.items()}
         query_vec = _tfidf(query, idf)
-        sims = [cosine(query_vec, _tfidf(b, idf)) for b in bags]
-        typical = _median([x for x in sims if x > 0]) or 1.0
-        return [min(1.0, sim / typical)
+        vecs = [_tfidf(b, idf) for b in bags]
+        to_topic = _relative([cosine(query_vec, v) for v in vecs])
+        to_page = _relative(cohesion(vecs))
+        return [(TOPIC_WEIGHT * t + (1 - TOPIC_WEIGHT) * c)
                 * (1.0 if subjects_agree(topic.subjects, item.subjects) else DISJOINT_SUBJECT)
-                for sim, item in zip(sims, items)]
+                for t, c, item in zip(to_topic, to_page, items)]
 
 
 def _median(values: list[float]) -> float:

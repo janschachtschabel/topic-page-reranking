@@ -40,9 +40,11 @@ class Scored:
 
 
 #: Which text of the topic page the materials are measured against. The
-#: description is the default: short and written for the page. The compendium
-#: text is longer and broader -- more vocabulary, also more that is not the topic.
-TOPIC_TEXTS = ("description", "compendium", "both")
+#: description is the default: short and written for the page. "headings" are the
+#: compendium's h1-h3 headings -- its outline, short enough for a cross-encoder.
+#: The full compendium text is longer and broader -- more vocabulary, also more
+#: that is not the topic. "both" is description plus full compendium.
+TOPIC_TEXTS = ("description", "headings", "compendium", "both")
 DEFAULT_TOPIC_TEXT = "description"
 
 
@@ -58,11 +60,13 @@ def topic_texts(topic: TopicPage, source: str = DEFAULT_TOPIC_TEXT) -> tuple[lis
     """
     if source not in TOPIC_TEXTS:
         raise ValueError(f"unknown topic text {source!r}, expected one of {TOPIC_TEXTS}")
-    available = {"description": topic.description, "compendium": topic.compendium}
+    available = {"description": topic.description, "compendium": topic.compendium,
+                 "headings": ", ".join(topic.compendium_headings)}
     wanted = ["description", "compendium"] if source == "both" else [source]
     used = [name for name in wanted if available[name]]
     if not used:
-        used = [name for name in ("description", "compendium") if available[name]]
+        # Stand-in, shortest first: what was asked for was short.
+        used = [name for name in ("description", "headings", "compendium") if available[name]][:1]
     label = "both" if len(used) == 2 else (used[0] if used else "none")
     return [available[name] for name in used], label
 

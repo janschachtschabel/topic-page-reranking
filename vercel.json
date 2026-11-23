@@ -2,7 +2,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 300,
-      "includeFiles": "{themenseiten_check/**,public/**}"
+      "includeFiles": "{themenseiten_check/**,public/**,model/**}"
     }
   }
 }

@@ -1,0 +1,42 @@
+# Builds model/ (int8 ONNX cross-encoder, weights in shards under 100 MiB) and
+# commits it -- so the model reaches the repository and Vercel without Git LFS
+# and without anyone running Python locally. Start it under Actions ->
+# "Modell vorbereiten" -> Run workflow.
+name: Modell vorbereiten
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Hugging-Face-Modell
+        required: true
+        default: cross-encoder/msmarco-MiniLM-L12-en-de-v1
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Werkzeuge installieren
+        run: pip install -r scripts/requirements-model.txt
+      - name: Modell laden, quantisieren, aufteilen
+        env:
+          MODEL: ${{ inputs.model }}   # via env, never spliced into the shell line
+        run: python scripts/prepare_model.py --model "$MODEL"
+      - name: model/ committen
+        env:
+          MODEL: ${{ inputs.model }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add model/
+          if git diff --cached --quiet; then echo "Keine Änderung."; exit 0; fi
+          git commit -m "model: $MODEL als int8-ONNX"
+          git push

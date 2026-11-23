@@ -1,0 +1,35 @@
+Update-Paket: Cross-Encoder, Seitenzusammenhalt, Markieren & Schwelle
+=====================================================================
+Basis: GitHub-Stand "Update VI". Enthält 20 neue oder geänderte Dateien
+in ihrer Ordnerstruktur. Das Modell selbst ist NICHT enthalten - es wird in
+Schritt 3 von einer GitHub-Action gebaut.
+
+1. Dateien hochladen
+   GitHub -> Repository topic-page-reranking -> "Add file" -> "Upload files"
+   -> den INHALT dieses Ordners hineinziehen (nicht den Ordner selbst)
+   -> "Commit changes".
+
+   Achtung: Der Ordner ".github" (Punkt am Anfang) wird beim Hochladen per
+   Browser oft übergangen. Danach prüfen, ob die Datei
+       .github/workflows/prepare-model.yml
+   im Repository liegt. Falls nicht: "Add file" -> "Create new file",
+   als Namen genau ".github/workflows/prepare-model.yml" eintippen und den
+   Inhalt der gleichnamigen Datei aus diesem Paket hineinkopieren.
+
+2. Alte Datei löschen
+   Die Datei "index.html" im HAUPTORDNER des Repositorys löschen
+   (öffnen -> Mülleimer-Symbol -> Commit). Die gültige Startseite liegt in
+   "public/index.html" - die NICHT löschen.
+
+3. Modell bauen lassen
+   GitHub -> Reiter "Actions" -> links "Modell vorbereiten" -> "Run workflow"
+   -> Modell stehen lassen (cross-encoder/msmarco-MiniLM-L12-en-de-v1)
+   -> "Run workflow". Dauer einige Minuten. Die Action legt den Ordner
+   "model/" an (Gewichte in Teildateien unter 95 MiB, kein Git LFS nötig)
+   und committet ihn.
+   Falls die Action rot wird: das Log des fehlgeschlagenen Schritts schicken.
+
+4. Vercel deployt nach jedem Commit automatisch. Danach in der App unter
+   "Optionen -> Verfahren" den "Cross-Encoder (MiniLM, int8)" wählen und
+   als Thementext "Beschreibung" oder "Überschriften des kompendialen Texts".
+   Solange model/ fehlt, ist die Option ausgegraut und nennt den Grund.

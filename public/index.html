@@ -46,6 +46,7 @@ input,select{font:inherit;color:var(--ink);background:var(--surface);border:1px 
 .more>details[open]>summary::before{content:"▾ "}
 .panel{margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.6rem 1.25rem;align-items:center;font-size:.9rem;color:#dfe7f5}
 .panel label{display:flex;gap:.4rem;align-items:center}
+.hint{flex-basis:100%;color:var(--lime);font-size:.82rem}
 .panel input[type=checkbox]{accent-color:var(--lime);width:1rem;height:1rem}
 .find input#q{flex:1;min-width:12rem}
 .find button{background:#fff;color:var(--navy);padding:.55rem 1rem}
@@ -124,6 +125,16 @@ details.d[open]{flex-basis:100%;order:2;font-size:.82rem}
 details.d summary{cursor:pointer}
 details.out>summary{cursor:pointer;font:600 .85rem/1.3 var(--head);color:var(--drop);margin:.2rem 0 .5rem}
 .empty{color:var(--muted);font-style:italic;font-size:.9rem;margin:.4rem 0 .8rem}
+.judge{display:flex;gap:.25rem}
+.judge button{font:600 .7rem/1 var(--head);padding:.28rem .55rem;background:transparent;color:var(--muted);border:1px solid var(--line)}
+.judge button[aria-pressed=true].yes{background:var(--keep);border-color:var(--keep);color:#fff}
+.judge button[aria-pressed=true].no{background:var(--drop);border-color:var(--drop);color:#fff}
+li.m.wrong{outline:2px dashed var(--drop);outline-offset:1px}
+li.m.wrong .rk::after{content:" !";color:var(--drop);font-weight:700}
+.calib{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:.55rem}
+.calib b{color:var(--ink)}
+.calib button{font:600 .78rem/1 var(--head);padding:.4rem .8rem;background:var(--navy);color:#fff}
+.calib button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
 .intro{max-width:76rem;margin:-3rem auto 0;padding:0 1.25rem}
 .intro div{background:var(--surface);border-radius:18px;padding:1.5rem 2rem;box-shadow:0 6px 30px rgba(8,36,80,.12);max-width:46rem}
 .intro h2{font:700 1.2rem/1.3 var(--head);margin:0 0 .4rem}
@@ -152,12 +163,19 @@ footer{color:var(--muted);font-size:.8rem;padding:2rem 1.25rem 3rem;max-width:76
       <details>
         <summary>Optionen</summary>
         <div class="panel">
+          <label>Verfahren
+            <select id="backend">
+              <option value="textstats" selected>Textstatistik</option>
+              <option value="crossencoder">Cross-Encoder (MiniLM, int8)</option>
+            </select></label>
           <label>Abgleich mit
             <select id="topictext">
               <option value="description" selected>Beschreibung der Themenseite</option>
+              <option value="headings">Überschriften des kompendialen Texts</option>
               <option value="compendium">kompendialem Text</option>
-              <option value="both">beidem</option>
+              <option value="both">Beschreibung und kompendialem Text</option>
             </select></label>
+          <span id="cehint" class="hint" hidden>Der Cross-Encoder liest vom Thementext nur die ersten rund 70 Wörter – für ihn besser Beschreibung oder Überschriften.</span>
           <label><input type="checkbox" id="searches" checked> gespeicherte Suchen annähern</label>
           <label><input type="checkbox" id="subs" checked> Unterthemen einbeziehen</label>
         </div>
@@ -194,7 +212,8 @@ footer{color:var(--muted);font-size:.8rem;padding:2rem 1.25rem 3rem;max-width:76
 const $ = id => document.getElementById(id);
 const HISTORY_KEY = "themenseiten-check:history";
 const KINDS = {seite: "Schwimmlinie", sammlung: "direkt zugeordnet", untersammlung: "Unterthema"};
-const TEXT_NAMES = {description: "Beschreibung", compendium: "kompendialer Text"};
+const TEXT_NAMES = {description: "Beschreibung", compendium: "kompendialer Text",
+                    headings: "Überschriften des kompendialen Texts"};
 let data = null;
 // Which <details> the reader opened, by key -- the lanes are redrawn on every
 // slider move and must not snap shut under the reader's hand.
@@ -244,14 +263,18 @@ function drawHistory() {
 
 function topicTexts(t, choice) {
   const used = choice.used === "both" ? ["description", "compendium"] : [choice.used];
+  // "both" means description and the full compendium; the headings are their own choice.
   const box = el("div", {class: "texts"});
-  for (const key of ["description", "compendium"]) {
-    const text = t[key];
+  const LABELS = {description: "Beschreibung", headings: "Überschriften des kompendialen Texts",
+                  compendium: "Kompendialer Text"};
+  const texts = {description: t.description, headings: (t.headings || []).join(" · "), compendium: t.compendium};
+  for (const key of ["description", "headings", "compendium"]) {
+    const text = texts[key];
     if (!text) continue;
-    const summary = el("summary", {}, key === "description" ? "Beschreibung" : "Kompendialer Text",
+    const summary = el("summary", {}, LABELS[key],
       used.includes(key) ? el("span", {class: "used"}, "für den Abgleich genutzt") : null,
       el("span", {class: "peek"}, text));
-    box.append(el("details", {}, summary, el("p", {}, text)));
+    box.append(el("details", {}, summary, el("p", {}, key === "headings" ? t.headings.join("\n") : text)));
   }
   const fellBack = choice.used !== choice.chosen && choice.chosen !== "both";
   // The fallback line already names the missing chosen text; say each gap once.
@@ -286,7 +309,9 @@ function drawSheet() {
   const verdict = el("div", {class: "verdict"}, el("div", {},
     el("span", {class: "count", id: "count"}),
     el("label", {}, "Schwelle", slider, el("output", {id: "cutval"})),
-    el("span", {class: "how"}, data.backend)));
+    el("span", {class: "how"}, data.backend),
+    el("div", {class: "calib", id: "calib"})));
+  loadLabels();
   $("out").replaceChildren(sheet, verdict, el("main", {class: "lanes", id: "lanes"}));
   drawLanes();
 }
@@ -308,7 +333,93 @@ function entry(id, rank, cut, moved) {
   const extra = [m.subjects.length ? "Fach: " + m.subjects.join(", ") : null, m.description || null,
                  m.keywords.length ? "Schlagworte: " + m.keywords.join(", ") : null].filter(Boolean);
   if (extra.length) foot.append(el("details", {class: "d"}, el("summary", {}, "Details"), extra.join("\n")));
-  return el("li", {class: "m" + (keep ? "" : " drop")}, row, foot);
+  foot.append(judgeButtons(id));
+  const judged = labels[id];
+  const wrong = judged !== undefined && judged !== keep;
+  return el("li", {class: "m" + (keep ? "" : " drop") + (wrong ? " wrong" : ""),
+                   title: wrong ? "Deine Markierung widerspricht der Bewertung" : ""}, row, foot);
+}
+
+// --- Marking materials, and what the marks say about the threshold. -------
+
+let labels = {};   // item id -> true (passt) / false (passt nicht), per topic page
+const labelKey = () => `themenseiten-check:labels:${data.topic.id}`;
+function loadLabels() {
+  try { labels = JSON.parse(localStorage.getItem(labelKey())) || {}; } catch { labels = {}; }
+}
+function saveLabels() {
+  try { localStorage.setItem(labelKey(), JSON.stringify(labels)); } catch {}
+}
+
+function judgeButtons(id) {
+  const make = (value, text, cls) => {
+    const b = el("button", {type: "button", class: cls, "aria-pressed": String(labels[id] === value),
+                            title: "Eigene Einschätzung – dient zum Einstellen der Schwelle"}, text);
+    b.onclick = () => {
+      if (labels[id] === value) delete labels[id]; else labels[id] = value;
+      saveLabels();
+      drawLanes();
+    };
+    return b;
+  };
+  return el("span", {class: "judge"}, make(true, "passt", "yes"), make(false, "passt nicht", "no"));
+}
+
+/** AUC of the ranking, and the threshold that best separates the marks (F1 on misfits). */
+function calibrate() {
+  const marked = Object.entries(labels).filter(([id]) => id in data.items);
+  const fit = marked.filter(([, v]) => v).map(([id]) => data.items[id].score);
+  const misfit = marked.filter(([, v]) => !v).map(([id]) => data.items[id].score);
+  if (!fit.length || !misfit.length) return {fit, misfit};
+  let pairs = 0;
+  for (const p of fit) for (const n of misfit) pairs += p > n ? 1 : p === n ? 0.5 : 0;
+  const scores = [...new Set([...fit, ...misfit])].sort((a, b) => a - b);
+  const cuts = [scores[0], ...scores.slice(1).map((s, i) => (s + scores[i]) / 2), scores.at(-1) + 0.001];
+  const f1 = t => {
+    const tp = misfit.filter(s => s < t).length, fp = fit.filter(s => s < t).length;
+    return tp ? 2 * tp / (2 * tp + fp + (misfit.length - tp)) : 0;
+  };
+  let best = {t: data.threshold, f1: -1};
+  for (const t of cuts) {
+    const v = f1(t);
+    if (v > best.f1 + 1e-9 || (Math.abs(v - best.f1) < 1e-9 && Math.abs(t - data.threshold) < Math.abs(best.t - data.threshold))) best = {t, f1: v};
+  }
+  return {fit, misfit, auc: pairs / (fit.length * misfit.length), best};
+}
+
+function exportLabels() {
+  const items = Object.entries(data.items).map(([id, m]) => ({id, title: m.title, score: m.score,
+    label: id in labels ? (labels[id] ? "passt" : "passt nicht") : null}));
+  const blob = new Blob([JSON.stringify({topic: data.topic, topic_text: data.topic_text, backend: data.backend,
+    threshold: Number($("cut").value), exported: new Date().toISOString(), items}, null, 2)], {type: "application/json"});
+  const a = el("a", {href: URL.createObjectURL(blob), download: `markierungen-${data.topic.title}.json`});
+  document.body.append(a); a.click(); a.remove();
+}
+
+function drawCalibration(cut) {
+  const c = calibrate();
+  const box = $("calib");
+  const n = c.fit.length + c.misfit.length;
+  if (!n) {
+    box.replaceChildren("Markiere einige Inhalte mit „passt“ oder „passt nicht“ – dann misst die App ihre Treffsicherheit und schlägt eine Schwelle vor.");
+    return;
+  }
+  const parts = [el("span", {}, `Deine Markierungen: ${c.fit.length} passend, ${c.misfit.length} unpassend.`)];
+  if (c.auc !== undefined) {
+    const found = c.misfit.filter(s => s < cut).length, lost = c.fit.filter(s => s < cut).length;
+    parts.push(el("span", {}, "Reihung ", el("b", {}, c.auc.toFixed(2)), " (1 = perfekt)."),
+      el("span", {}, `Bei ${cut.toFixed(2)}: ${found} von ${c.misfit.length} unpassenden erkannt, ${lost} passende aussortiert.`));
+    const take = el("button", {type: "button"}, `Schwelle ${c.best.t.toFixed(2)} übernehmen`);
+    take.onclick = () => { $("cut").value = c.best.t.toFixed(2); drawLanes(); };
+    if (Math.abs(c.best.t - cut) >= 0.005) parts.push(take);
+  } else {
+    parts.push(el("span", {}, "Für einen Vorschlag braucht es beides: passende und unpassende Markierungen."));
+  }
+  const exp = el("button", {type: "button", class: "ghost"}, "Markierungen exportieren");
+  exp.onclick = exportLabels;
+  const reset = el("button", {type: "button", class: "ghost"}, "Zurücksetzen");
+  reset.onclick = () => { labels = {}; saveLabels(); drawLanes(); };
+  box.replaceChildren(...parts, exp, reset);
 }
 
 function lane(l, cut) {
@@ -352,6 +463,7 @@ function drawLanes() {
   $("count").replaceChildren(el("mark", {}, `${misfits} von ${all.length}`), " Inhalten passen nicht zum Thema");
   $("cutval").textContent = cut.toFixed(2);
   $("lanes").replaceChildren(...data.lanes.map(l => lane(l, cut)));
+  drawCalibration(cut);
 }
 
 // --- Requests ---------------------------------------------------------------
@@ -382,6 +494,7 @@ async function run(url, label = url) {
   setStatus("loading", "Themenseite wird gelesen und bewertet. Bei großen Seiten mit Unterthemen dauert das einige Sekunden.");
   try {
     const {res, answer} = await post("/api/analyze", {url, topic_text: $("topictext").value,
+      backend: $("backend").value,
       subcollections: $("subs").checked, run_searches: $("searches").checked});
     if (res.status === 409 && answer.choices) { offerChoices(answer.error, answer.choices, label); return; }
     if (!res.ok) throw new Error(answer.error || `HTTP ${res.status}`);
@@ -437,8 +550,21 @@ $("sgo").onclick = search;
 $("q").onkeydown = $("subject").onkeydown = ev => { if (ev.key === "Enter") { ev.preventDefault(); search(); } };
 drawHistory();
 
+function updateHint() {
+  $("cehint").hidden = !($("backend").value === "crossencoder"
+                         && ["compendium", "both"].includes($("topictext").value));
+}
+$("backend").onchange = $("topictext").onchange = updateHint;
+
 fetch("/api/config").then(r => r.json()).then(cfg => {
   if (cfg.password) $("pwbox").hidden = false;
+  const ce = cfg.crossencoder || {};
+  const opt = $("backend").querySelector('option[value="crossencoder"]');
+  if (!ce.available) {
+    opt.disabled = true;
+    opt.textContent += " – nicht verfügbar";
+    $("backend").title = ce.reason || "";
+  }
 }).catch(() => {});
 </script>
 </body>

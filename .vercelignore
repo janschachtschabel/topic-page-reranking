@@ -3,3 +3,5 @@ pyproject.toml
 tests/
 reports/
 .env
+scripts/
+.github/
