@@ -48,34 +48,53 @@ des Clients). Die Beschreibung ist auf Portalseiten oft allgemein („Hier
 findest du zahlreiches kostenloses Material für Physik!“); der kompendiale
 Text sagt, was das Thema ist.
 
-Bewertung, beide über die B-API:
+Bewertung – kostenfrei, ohne Schlüssel und ohne Modell, per **Textstatistik**:
 
-* **LLM-Bewertung** (Standard): ein Chatmodell vergibt je Material 0–10 für
-  „gehört zum Thema“, 15 Materialien je Anfrage, bis zu vier parallel.
-  Repository-Texte gehen als markierte Fremddaten in den Prompt.
-* **Embeddings**: Kosinus-Ähnlichkeit, schneller, gröber.
+* **Zeichen-n-Gramme (4 und 5 Zeichen) mit TF-IDF**: Thema (Titel ×3,
+  Schlagworte ×2, kompendialer Text ×1,5, Beschreibung ×0,5) und Material
+  (Titel ×2, Schlagworte ×1,5, Beschreibung ×1) werden als Vektoren verglichen,
+  die Wortgewichte aus allen Inhalten der Seite. n-Gramme statt ganzer Wörter
+  wegen deutscher Komposita und Beugung: „Linsen“ und „Sammellinse“ teilen kein
+  Wort, aber „lins“, „inse“, „linse“.
+* **Fachabgleich**: Ein Material, dessen Fächer keines mit der Themenseite
+  teilen (Mathematik auf der Optik-Seite), bekommt höchstens 0,4.
+* **Skala**: 1,0 heißt „so nah am Thema wie ein typischer Inhalt dieser Seite“
+  (Median), Standardschwelle 0,5. Die Annahme dahinter: Der Großteil einer Seite
+  passt. Ohne Modell gibt es keinen absoluten Maßstab.
 
-Der Cross-Encoder der Kommandozeile läuft auf Vercel nicht (torch sprengt die
-Funktionsgröße).
+Aus dem Reranker von wlo-mcp-sc übernommen: Felder unterschiedlich gewichten,
+Stoppwörter ignorieren. Nicht übernommen: den Bonus für Metadatenqualität
+(Lizenz, Vorschaubild, Herausgeber) – er bewertet, ob ein Datensatz gut gepflegt
+ist, nicht, ob er zum Thema gehört.
+
+Wie gut das ist: Auf einer selbst gebauten Beispielseite (Optik, 11 passende,
+7 unpassende Materialien, `tests/test_textstats.py`) liegt die Reihung bei
+AUC 0,97; alle passenden bleiben, alle fachfremden fallen heraus. Fachgleiche
+Fehlzuordnungen (Mechanik, Akustik auf der Optik-Seite) bleiben dagegen über der
+Schwelle – dafür reicht Wortstatistik nicht. Die Beispielseite ist klein und für
+diesen Zweck geschrieben; die Zahl ist ein Wächter gegen Verschlechterung, kein
+Qualitätsnachweis. Ausprobiert und verworfen: 3-Gramme, Endungen abschneiden,
+Unterthemen-Titel als Themenvokabular – alle drei verschlechterten die Reihung.
+
+Der Cross-Encoder der Kommandozeile (lokal, ebenfalls kostenfrei) läuft auf
+Vercel nicht: torch sprengt die Funktionsgröße.
 
 ### Deployen
 
 ```bash
 npm i -g vercel
-vercel                 # im Projektordner; Framework-Preset "Other"
+vercel                 # im Projektordner; Vercel erkennt die FastAPI-App selbst
 ```
 
-Umgebungsvariablen im Vercel-Projekt setzen (siehe `.env.example`):
-`B_API_BASE_URL`, `B_API_KEY` (Pflicht), `DEMO_PASSWORD` (dringend empfohlen –
-sonst kann jeder mit dem Link deinen B-API-Schlüssel verbrauchen), optional
-`EDU_SHARING_URL` (Standard: Staging), `EDU_SHARING_USER`/`EDU_SHARING_PASSWORD`,
-`LLM_MODEL`, `EMBEDDING_MODEL`, `PORTAL_HOSTS`. Ist `DEMO_PASSWORD` gesetzt, erscheint das
-Passwortfeld nach dem ersten abgewiesenen Versuch.
+Umgebungsvariablen sind keine nötig. Optional (siehe `.env.example`):
+`DEMO_PASSWORD` – jede Prüfung schickt einige hundert Anfragen an das
+Repositorium; mit Passwort erscheint das Feld beim Laden –, `EDU_SHARING_URL`
+(Standard: Staging), `EDU_SHARING_USER`/`EDU_SHARING_PASSWORD`, `PORTAL_HOSTS`.
 
 Lokal: `vercel dev`. Die Funktion darf 300 s laufen (`vercel.json`, auf dem
 Hobby-Plan das Maximum mit Fluid Compute). Gelesen werden bis zu 400 Inhalte;
-mit LLM-Bewertung dauert eine Seite wie Optik (rund 360 Inhalte) ein bis zwei
-Minuten, mit Embeddings Sekunden.
+die Zeit geht fast ganz auf das Lesen, die Bewertung selbst braucht
+Millisekunden.
 `.vercelignore` blendet `pyproject.toml` aus, damit Vercel aus
 `requirements.txt` baut (Client auf einen Commit festgelegt).
 
@@ -84,8 +103,8 @@ Minuten, mit Embeddings Sekunden.
 ### Installation
 
 ```bash
-pip install -e ".[local,dev]"   # mit lokalem Cross-Encoder (zieht torch)
-pip install -e ".[dev]"         # nur B-API-Embeddings
+pip install -e ".[dev]"         # Textstatistik
+pip install -e ".[local,dev]"   # zusätzlich lokaler Cross-Encoder (zieht torch)
 ```
 
 Python 3.11+. Umgebungsvariablen siehe `.env.example`; ohne Angaben läuft alles
@@ -97,16 +116,15 @@ anonym gegen Staging.
 themenseiten-check --search Optik --subject Physik # IDs von Themenseiten finden
 themenseiten-check <sammlungs-id>                  # -> reports/<id>.html
 themenseiten-check <sammlungs-id> --subcollections --threshold 0.4
-themenseiten-check <sammlungs-id> --backend bapi   # braucht B_API_BASE_URL, B_API_KEY
+themenseiten-check <sammlungs-id> --backend local  # Cross-Encoder
 ```
 
 | Option | Bedeutung |
 |---|---|
-| `--backend local` | Cross-Encoder `BAAI/bge-reranker-v2-m3` (mehrsprachig, lokal, Score 0–1, Schwelle 0.30). Standard. |
-| `--backend bapi` | Kosinus-Ähnlichkeit von Embeddings über die B-API, Provider `openai` (Schwelle 0.35). |
-| `--backend llm` | LLM-Bewertung über die B-API wie in der Web-App (Schwelle 0.50). |
+| `--backend textstats` | Textstatistik wie in der Web-App (Schwelle 0.50). Standard. |
+| `--backend local` | Cross-Encoder `BAAI/bge-reranker-v2-m3` (mehrsprachig, lokal, kostenfrei, Score 0–1, Schwelle 0.30). |
 | `--searches` | gespeicherte Suchen der Widgets angenähert ausführen |
-| `--model` | anderes Modell für das gewählte Backend |
+| `--model` | anderes Modell für `--backend local` |
 | `--threshold` | Mindestscore für „passend“ |
 | `--subcollections` | Inhalte direkter Untersammlungen mitbewerten |
 | `--no-widgets` | Seitenlayout (Schwimmlinien) ignorieren |
@@ -141,7 +159,8 @@ unter den Hinweisen.
 | `serialize.py` | Ergebnis als JSON für die Web-App |
 | `search.py` | Themenseiten über die Sammlungssuche finden |
 | `scoring.py` | Abfrage- und Dokumenttext bauen, sortieren, Schwelle anwenden |
-| `backends.py` | Cross-Encoder, B-API-Embeddings, LLM-Bewertung |
+| `textstats.py` | Textstatistik: n-Gramme, TF-IDF, Fachabgleich |
+| `backends.py` | lokaler Cross-Encoder |
 | `report.py` | HTML-Bericht der Kommandozeile |
 | `cli.py` | Kommandozeile |
 | `api/index.py` | Vercel-Funktion: `POST /api/analyze`, `POST /api/search` |
@@ -154,8 +173,8 @@ pytest
 ```
 
 Offline: `test_check.py` mit einem Fake-Repositorium, `test_integration.py` geht
-durch die echte Bibliothek mit gemocktem HTTP, `test_portal.py` die Auflösung von Portal-URLs samt Host-Sperre, `test_web.py` prüft URL-Erkennung,
-LLM-Bewertung und den Endpunkt. Für die Web-Tests zusätzlich `pip install fastapi`.
+durch die echte Bibliothek mit gemocktem HTTP, `test_portal.py` die Auflösung von Portal-URLs samt Host-Sperre, `test_textstats.py` die
+Textstatistik samt Beispielseite, `test_web.py` URL-Erkennung und Endpunkte. Für die Web-Tests zusätzlich `pip install fastapi`.
 
 ## Welche Teile des Clients benutzt werden
 
@@ -165,7 +184,7 @@ LLM-Bewertung und den Endpunkt. Für die Web-Tests zusätzlich `pip install fast
 | Texte der Themenseite | `repo.flows.describe(id)` – Beschreibung, Schlagworte, kompendialer Text über `repo.metadata_profile.compendium_property` |
 | Schwimmlinien | `repo.flows.page(id, resolve_widgets=True)` |
 | Inhalte | `repo.flows.collection_contents(id, …)`, `repo.flows.describe_many(ids)`, gespeicherte Suchen über `repo.flows.search(…, raw_filters=…)` |
-| Bewertung | `BildungsAPI.chat`, `BildungsAPI.embeddings`, `edusharing.agent.as_untrusted` |
+| Bewertung | Stoppwörter aus `edusharing.language.GERMAN` |
 
 ## Grenzen
 

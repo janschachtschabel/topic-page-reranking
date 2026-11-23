@@ -72,7 +72,10 @@ async def rerank(topic: TopicPage, reranker: Reranker,
     if not topic.items:
         return []
     cut = reranker.default_threshold if threshold is None else threshold
-    scores = await reranker.score(topic_query(topic), [item_text(i) for i in topic.items])
+    if hasattr(reranker, "score_page"):  # needs the whole page, e.g. for IDF
+        scores = await reranker.score_page(topic, list(topic.items))
+    else:
+        scores = await reranker.score(topic_query(topic), [item_text(i) for i in topic.items])
     if len(scores) != len(topic.items):
         raise RuntimeError(f"{reranker.name} returned {len(scores)} scores "
                            f"for {len(topic.items)} items")

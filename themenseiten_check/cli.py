@@ -1,8 +1,7 @@
 """Command line: one topic page in, one HTML comparison out.
 
-    themenseiten-check <collection-id>                # local cross-encoder
-    themenseiten-check <collection-id> --backend bapi # embeddings via B-API
-    themenseiten-check <collection-id> --backend llm  # chat-model rating via B-API
+    themenseiten-check <collection-id>                   # text statistics, no setup
+    themenseiten-check <collection-id> --backend local   # cross-encoder (needs .[local])
     themenseiten-check --search Optik --subject Physik # find topic page ids
 """
 
@@ -17,12 +16,12 @@ from pathlib import Path
 
 from edusharing import AsyncRepository, EduSharingError
 
-from .backends import (DEFAULT_CROSS_ENCODER, DEFAULT_EMBEDDING_MODEL,
-                       CrossEncoderReranker, EmbeddingReranker, LLMReranker)
+from .backends import DEFAULT_CROSS_ENCODER, CrossEncoderReranker
 from .collect import load_topic_page
 from .report import render
 from .scoring import rerank
 from .search import find_topic_pages
+from .textstats import TextStatsReranker
 
 STAGING = "https://repository.staging.openeduhub.net"
 
@@ -33,9 +32,8 @@ def _args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("collection_id", nargs="?", help="ID der Sammlung hinter der Themenseite")
     p.add_argument("--search", metavar="BEGRIFF", help="Themenseiten zu einem Begriff auflisten und beenden")
     p.add_argument("--subject", default="", help="Fach für --search, z. B. Physik")
-    p.add_argument("--backend", choices=("local", "bapi", "llm"), default="local")
-    p.add_argument("--model", help=f"local: {DEFAULT_CROSS_ENCODER}, bapi: {DEFAULT_EMBEDDING_MODEL}, "
-                                   "llm: automatisch")
+    p.add_argument("--backend", choices=("textstats", "local"), default="textstats")
+    p.add_argument("--model", help=f"nur für --backend local, Vorgabe {DEFAULT_CROSS_ENCODER}")
     p.add_argument("--threshold", type=float, help="Mindestscore für 'passend' (Vorgabe je Backend)")
     p.add_argument("--max-items", type=int, default=200)
     p.add_argument("--subcollections", action="store_true", help="Inhalte direkter Untersammlungen einbeziehen")
@@ -79,13 +77,8 @@ async def _run(args: argparse.Namespace) -> int:
         if args.search:
             return await _list_pages(repo, args.search, args.subject)
 
-        if args.backend in ("bapi", "llm"):
-            from edusharing.bapi import BildungsAPI
-            api = await stack.enter_async_context(BildungsAPI.from_env())
-            reranker = (EmbeddingReranker(api, args.model or DEFAULT_EMBEDDING_MODEL)
-                        if args.backend == "bapi" else LLMReranker(api, args.model))
-        else:
-            reranker = CrossEncoderReranker(args.model or DEFAULT_CROSS_ENCODER)
+        reranker = (CrossEncoderReranker(args.model or DEFAULT_CROSS_ENCODER)
+                    if args.backend == "local" else TextStatsReranker())
 
         topic = await load_topic_page(repo, args.collection_id, max_items=args.max_items,
                                       include_subcollections=args.subcollections,

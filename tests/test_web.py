@@ -1,4 +1,4 @@
-"""The web side: URL parsing, the LLM reranker, JSON shape, the Vercel endpoint."""
+"""The web side: URL parsing, JSON shape, the Vercel endpoint."""
 
 import asyncio
 import importlib.util
@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from themenseiten_check.backends import LLMReranker, parse_scores
 from themenseiten_check.collect import Item, Lane, TopicPage
 from themenseiten_check.scoring import rerank
 from themenseiten_check.serialize import page_as_json
@@ -32,38 +31,6 @@ def test_collection_id_from(text):
 def test_collection_id_from_rejects_text_without_uuid():
     with pytest.raises(ValueError):
         collection_id_from("https://wirlernenonline.de/optik")
-
-
-def test_parse_scores():
-    assert parse_scores('Hier: {"scores": [10, 0, 5]}', 3) == [1.0, 0.0, 0.5]
-    assert parse_scores('{"scores": [12, -1]}', 2) == [1.0, 0.0]
-    for bad in ('{"scores": [1]}', "keine Ahnung", '{"scores": ["7", 3]}', '{"scores": [true, 1]}'):
-        with pytest.raises(ValueError):
-            parse_scores(bad, 2)
-
-
-class FakeChat:
-    def __init__(self, answers):
-        self.answers, self.prompts = list(answers), []
-
-    async def chat(self, prompt, *, model, system, max_tokens, temperature):
-        self.prompts.append(prompt)
-        return self.answers.pop(0)
-
-
-def test_llm_reranker_batches_marks_untrusted_and_retries():
-    docs = [f"Material {i}" for i in range(20)]
-    api = FakeChat(["kaputt", json.dumps({"scores": [8] * 15}), json.dumps({"scores": [2] * 5})])
-    scores = asyncio.run(LLMReranker(api).score("Optik", docs))
-    assert scores == [0.8] * 15 + [0.2] * 5
-    assert len(api.prompts) == 3                       # one retry for the malformed answer
-    assert "UNTRUSTED CONTENT" in api.prompts[0] and "Material 1" in api.prompts[0]
-
-
-def test_llm_reranker_gives_up_after_one_retry():
-    api = FakeChat(["kaputt", "noch kaputt"])
-    with pytest.raises(RuntimeError):
-        asyncio.run(LLMReranker(api).score("Optik", ["a"]))
 
 
 def _topic():
@@ -92,7 +59,7 @@ def test_page_as_json_carries_scores_not_verdicts():
 
 
 def _load_app(monkeypatch, **env):
-    for key in ("DEMO_PASSWORD", "B_API_KEY"):
+    for key in ("DEMO_PASSWORD",):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -101,14 +68,6 @@ def _load_app(monkeypatch, **env):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-class FakeApi:
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
 
 
 class FakeRepo:
@@ -130,9 +89,8 @@ def test_endpoint_end_to_end(monkeypatch):
         return _topic()
 
     monkeypatch.setattr(mod, "_repository", FakeRepo)
-    monkeypatch.setattr(mod.BildungsAPI, "from_env", classmethod(lambda cls: FakeApi()))
     monkeypatch.setattr(mod, "load_topic_page", fake_load)
-    monkeypatch.setattr(mod, "LLMReranker", lambda api, model: Half())
+    monkeypatch.setattr(mod, "TextStatsReranker", Half)
 
     res = TestClient(mod.app).post("/api/analyze", json={"url": f"https://x/?id={ID}"})
     assert res.status_code == 200
@@ -146,14 +104,29 @@ def test_endpoint_password_and_bad_input(monkeypatch):
     assert client.post("/api/analyze", json={"url": ID}).status_code == 401
     bad = client.post("/api/analyze", json={"url": "ohne id"}, headers={"X-Demo-Password": "geheim"})
     assert bad.status_code == 400 and "UUID" in bad.json()["error"]
-    assert client.post("/api/analyze", json={"url": ID, "backend": "x"},
+    assert client.post("/api/analyze", json={"url": ID, "max_items": 0},
                        headers={"X-Demo-Password": "geheim"}).status_code == 422
 
 
-def test_endpoint_reports_missing_bapi_key(monkeypatch):
+def test_endpoint_scores_with_text_statistics(monkeypatch):
     mod = _load_app(monkeypatch)
+
+    async def fake_load(repo, cid, **kw):
+        return _topic()
+
+    monkeypatch.setattr(mod, "_repository", FakeRepo)
+    monkeypatch.setattr(mod, "load_topic_page", fake_load)
     res = TestClient(mod.app).post("/api/analyze", json={"url": ID})
-    assert res.status_code == 502 and "B_API_KEY" in res.json()["error"]
+    assert res.status_code == 200
+    items = res.json()["items"]
+    assert items["a"]["score"] > items["b"]["score"]
+    assert res.json()["backend"].startswith("Textstatistik")
+
+
+def test_config_reports_password(monkeypatch):
+    assert TestClient(_load_app(monkeypatch).app).get("/api/config").json() == {"password": False}
+    mod = _load_app(monkeypatch, DEMO_PASSWORD="x")
+    assert TestClient(mod.app).get("/api/config").json() == {"password": True}
 
 
 def test_endpoint_hands_back_choices(monkeypatch):

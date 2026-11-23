@@ -5,10 +5,10 @@ POST /api/analyze scores one topic page, POST /api/search finds topic pages.
 No rewrite in vercel.json: a rewrite to /api/index replaces the path the app
 sees, and every route then answers 404 (measured on the first deployment).
 
-Repository and B-API come from the environment (see .env.example); a request
-can only choose *which* topic page and how it is scored. With DEMO_PASSWORD
-set, every request must carry it -- otherwise anyone with the link spends the
-B-API budget.
+The repository comes from the environment (see .env.example); a request can
+only choose *which* topic page is read. Scoring is text statistics: free, no
+key, no model. With DEMO_PASSWORD set, every request must carry it -- the app
+costs nothing, but each check sends a few hundred requests to the repository.
 """
 
 import hmac
@@ -16,7 +16,6 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Literal
 
 # The package lives next to api/, not on the function's import path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -27,12 +26,11 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 from edusharing import AsyncRepository, EduSharingError, NotFoundError  # noqa: E402
 from edusharing.agent.safety import UnsafeUrlError  # noqa: E402
-from edusharing.bapi import BildungsAPI  # noqa: E402
-from themenseiten_check.backends import EmbeddingReranker, LLMReranker  # noqa: E402
 from themenseiten_check.collect import load_topic_page  # noqa: E402
 from themenseiten_check.scoring import rerank  # noqa: E402
 from themenseiten_check.search import find_topic_pages  # noqa: E402
 from themenseiten_check.serialize import page_as_json  # noqa: E402
+from themenseiten_check.textstats import TextStatsReranker  # noqa: E402
 from themenseiten_check.portal import DEFAULT_HOSTS, NeedsChoice, resolve  # noqa: E402
 
 STAGING = "https://repository.staging.openeduhub.net"
@@ -45,7 +43,6 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 class Request(BaseModel):
     url: str = Field(max_length=2000)
-    backend: Literal["llm", "embeddings"] = "llm"
     subcollections: bool = True
     run_searches: bool = True
     max_items: int = Field(default=400, ge=1, le=600)
@@ -92,6 +89,12 @@ async def index():
     return FileResponse(INDEX, media_type="text/html; charset=utf-8")
 
 
+@app.get("/api/config")
+async def config():
+    """What the page needs to know before the first request."""
+    return {"password": bool(os.environ.get("DEMO_PASSWORD"))}
+
+
 @app.post("/api/search")
 async def search(body: SearchRequest, x_demo_password: str = Header(default="")):
     if not _authorized(x_demo_password):
@@ -117,23 +120,16 @@ async def analyze(body: Request, x_demo_password: str = Header(default="")):
                 return JSONResponse({"error": str(exc), "choices": exc.choices}, status_code=409)
             except (ValueError, UnsafeUrlError) as exc:
                 return _error(400, str(exc))
-            async with BildungsAPI.from_env() as api:
-                reranker = (LLMReranker(api, os.environ.get("LLM_MODEL") or None)
-                            if body.backend == "llm"
-                            else EmbeddingReranker(api, os.environ.get("EMBEDDING_MODEL")
-                                                   or "text-embedding-3-small"))
-                topic = await load_topic_page(repo, collection_id, max_items=body.max_items,
-                                              include_subcollections=body.subcollections,
-                                              run_searches=body.run_searches)
-                scored = await rerank(topic, reranker)
-                return page_as_json(topic, scored, backend=reranker.name,
-                                    threshold=reranker.default_threshold, repository=repo.url)
+            topic = await load_topic_page(repo, collection_id, max_items=body.max_items,
+                                          include_subcollections=body.subcollections,
+                                          run_searches=body.run_searches)
+            reranker = TextStatsReranker()
+            scored = await rerank(topic, reranker)
+            return page_as_json(topic, scored, backend=reranker.name,
+                                threshold=reranker.default_threshold, repository=repo.url)
     except NotFoundError:
         return _error(404, f"Keine Sammlung mit der ID {collection_id or '?'} gefunden.")
     except EduSharingError as exc:
         # Library messages carry no stack traces and no secrets; the type helps the reader.
-        log.warning("edu-sharing/B-API error: %s", exc)
+        log.warning("edu-sharing error: %s", exc)
         return _error(502, f"{type(exc).__name__}: {exc}")
-    except RuntimeError as exc:
-        log.warning("scoring failed: %s", exc)
-        return _error(502, f"Bewertung fehlgeschlagen: {exc}")

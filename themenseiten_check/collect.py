@@ -72,6 +72,8 @@ class TopicPage:
     #: WLO) -- usually far more telling about the topic than the description.
     #: Read from the metadata profile, so another metadata set can name its own.
     compendium: str = ""
+    #: Subject labels of the collection (``fields.subject`` of ``describe``).
+    subjects: tuple[str, ...] = ()
 
 
 def _item(raw: dict[str, Any], source: str) -> Item:
@@ -239,5 +241,6 @@ async def load_topic_page(repo: AsyncRepository, collection_id: str, *,
         description=(meta.get("description") or "").strip(),
         keywords=tuple(meta.get("keywords") or ()), url=meta.get("url") or "",
         compendium=_compendium(repo, meta),
+        subjects=tuple((meta.get("fields") or {}).get("subject") or ()),
         items=tuple(builder.items.values()), lanes=tuple(builder.lanes),
         notes=tuple(builder.notes))

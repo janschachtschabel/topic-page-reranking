@@ -84,11 +84,6 @@ footer{color:var(--muted);font-size:.85rem;padding:2rem 0}
     <button id="go" type="submit">Prüfen</button>
   </div>
   <div class="opts">
-    <label>Bewertung
-      <select id="backend">
-        <option value="llm">LLM-Bewertung (genauer)</option>
-        <option value="embeddings">Embeddings (schneller)</option>
-      </select></label>
     <label><input type="checkbox" id="searches" checked> gespeicherte Suchen annähern</label>
     <label><input type="checkbox" id="subs" checked> Unterthemen einbeziehen</label>
     <label id="pwbox" hidden>Passwort <input type="password" id="pw" autocomplete="current-password"></label>
@@ -265,16 +260,14 @@ $("sf").onsubmit = async ev => {
 };
 
 async function run(url, label = url) {
-  const llm = $("backend").value === "llm";
   $("go").disabled = true;
   $("status").className = "status";
-  $("status").textContent = llm ? "Themenseite wird gelesen und bewertet. Mit LLM-Bewertung dauert das je nach Seitengröße ein bis zwei Minuten."
-                                : "Themenseite wird gelesen und bewertet …";
+  $("status").textContent = "Themenseite wird gelesen und bewertet …";
   try {
     const res = await fetch("/api/analyze", {
       method: "POST",
       headers: {"Content-Type": "application/json", "X-Demo-Password": $("pw").value},
-      body: JSON.stringify({url, backend: $("backend").value, subcollections: $("subs").checked,
+      body: JSON.stringify({url, subcollections: $("subs").checked,
                             run_searches: $("searches").checked}),
     });
     const body = await res.json().catch(() => ({error: `Antwort ohne JSON (HTTP ${res.status}).`}));
@@ -283,7 +276,7 @@ async function run(url, label = url) {
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     data = body;
     $("status").textContent = "";
-    $("out").replaceChildren();  // new page: start from its backend's threshold
+    $("out").replaceChildren();  // new page: start from the default threshold
     draw();
     // A chosen candidate is remembered by its id: the portal URL alone stays ambiguous.
     remember(url, data.topic.title);
@@ -295,6 +288,10 @@ async function run(url, label = url) {
   }
 }
 drawHistory();
+
+fetch("/api/config").then(r => r.json()).then(cfg => {
+  if (cfg.password) $("pwbox").hidden = false;
+}).catch(() => {});
 </script>
 </body>
 </html>

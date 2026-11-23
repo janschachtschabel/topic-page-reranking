@@ -7,7 +7,6 @@ import re
 
 import pytest
 
-from themenseiten_check.backends import EmbeddingReranker, cosine
 from themenseiten_check.collect import load_topic_page
 from themenseiten_check.report import render
 from themenseiten_check.scoring import item_text, rerank, topic_query
@@ -177,20 +176,3 @@ def test_report_escapes_and_shows_both_sides():
     assert "javascript:" not in html
     assert "1 von 2</strong>" in html
     assert "Nach Reranking (1)" in html and "Aussortiert (1)" in html
-
-
-def test_embedding_reranker_batches_and_uses_cosine():
-    class FakeApi:
-        def __init__(self):
-            self.batches = []
-
-        async def embeddings(self, texts, *, model, provider):
-            assert provider == "openai"
-            self.batches.append(len(texts))
-            return [[1.0, 0.0] if "licht" in t.lower() else [0.0, 1.0] for t in texts]
-
-    api = FakeApi()
-    scores = run(EmbeddingReranker(api).score("Licht", ["Licht"] * 70 + ["Brüche"]))
-    assert api.batches == [64, 8]
-    assert scores[0] == pytest.approx(1.0) and scores[-1] == pytest.approx(0.0)
-    assert cosine([0, 0], [1, 1]) == 0.0
