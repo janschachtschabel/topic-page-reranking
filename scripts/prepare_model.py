@@ -190,7 +190,9 @@ def main(argv: list[str] | None = None) -> int:
         "total_mib": round(sum(f.stat().st_size for f in files) / MiB, 1),
         "check_fp32_vs_int8": check,
     }
-    (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
+    # Explicit UTF-8: Windows writes cp1252 by default, which a UTF-8 reader rejects.
+    (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+                                            encoding="utf-8")
     print(json.dumps({k: manifest[k] for k in ("model", "revision", "total_mib")}, ensure_ascii=False))
     for row in check:
         print(f"  fp32 {row['fp32']:+.3f}  int8 {row['int8']:+.3f}  {row['query']} | {row['doc']}")

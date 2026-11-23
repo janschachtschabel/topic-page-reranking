@@ -118,21 +118,39 @@ JSON – Grundlage, um Schwelle und Gewichte an echten Seiten nachzustellen.
 ### Alternative: kleiner Cross-Encoder (ONNX, int8)
 
 Unter „Optionen → Verfahren“ lässt sich statt der Textstatistik ein
-Cross-Encoder wählen: `cross-encoder/msmarco-MiniLM-L12-en-de-v1` (Deutsch/
+Cross-Encoder oder die Kombination aus beiden wählen. Der Cross-Encoder ist `cross-encoder/msmarco-MiniLM-L12-en-de-v1` (Deutsch/
 Englisch), int8-quantisiert und als ONNX ausgeliefert, ohne torch. Er bewertet
 jedes Paar (Thema, Material) zusammen und liest davon höchstens 256 Token; der
 Thementext wird auf 96 Token gekürzt. Für ihn eignen sich die **Beschreibung**
 oder die **Überschriften des kompendialen Texts** (h1–h3, ohne Inhaltsverzeichnis,
 Dokumenttitel, „Teil 1 …“ und die nummerierten Schema-Abschnitte); vom
 vollständigen kompendialen Text sähe er nur die ersten Zeilen, die Seite weist
-darauf hin. Scores werden wie bei der Textstatistik auf den Median der Seite
-bezogen, Fachfremdes ×0,4. Die Schwelle 0,5 ist **nicht kalibriert** – das echte
-Modell lief beim Schreiben nirgends; „passt / passt nicht“ markieren und den
-Vorschlag übernehmen.
+darauf hin.
 
-**Modell ins Repository bringen** – kein Git LFS nötig: GitHub lehnt Dateien
-über 100 MiB ab, das Modell ist auch in int8 rund 118 MB (96 MB davon das
-mehrsprachige Vokabular). `scripts/prepare_model.py` lädt es von Hugging Face,
+Seine Logits liegen bei „Thema gegen Material“ weit unter null und verschieben
+sich von Seite zu Seite (msmarco ist auf Suchanfragen trainiert). Sie werden
+deshalb auf die Skala der Seite gelegt: Median 0,5, zwei mittlere Abweichungen
+darüber 1,0, darunter 0,0; Fachfremdes ×0,4.
+
+**Gemessen mit dem ausgelieferten int8-Modell** an den Beispielseiten
+(Beschreibung als Thementext; `tests/test_model_real.py` wacht darüber):
+
+| Verfahren | Reihung (AUC) Optik / Geometrie / Techn. Informatik | Standardschwelle: passende behalten, unpassende raus |
+|---|---|---|
+| Textstatistik | 1,00 / 1,00 / 1,00 | 0,60: 33/33, 17/18 |
+| Cross-Encoder | 0,93 / 0,91 / 0,82 | 0,25: 29/33, 13/18 |
+| Kombination (je zur Hälfte) | 1,00 / 1,00 / 0,92 | 0,40: 32/33, 16/18 |
+
+Mit dem vollständigen kompendialen Text als Thema fiel der Cross-Encoder auf
+0,75 / 0,83 / 0,57 – er sieht nur dessen Anfang. Rechenzeit rund 25 ms je
+Material, also etwa 10 s für 400; das Laden des Modells beim ersten Aufruf
+etwa 1 s. Die Beispielseiten sind beim Abstimmen der Textstatistik entstanden
+und begünstigen sie; welches Verfahren auf echten Seiten trägt, zeigen die
+Markierungen „passt / passt nicht“ in der App.
+
+**Modell im Repository** (`model/`, 121,5 MiB, liegt bei) – kein Git LFS nötig:
+GitHub lehnt Dateien über 100 MiB ab; die größte Datei, das mehrsprachige
+Vokabular, hat 91,6 MiB. `scripts/prepare_model.py` lädt es von Hugging Face,
 quantisiert es dynamisch auf int8 und schreibt die Gewichte als ONNX-„external
 data“ in Teildateien `weights-NN.bin` unter 95 MiB (ASCII-Namen, damit ein
 Windows-Checkout sie anlegen kann); `manifest.json` hält Quelle, Revision,
@@ -193,7 +211,8 @@ themenseiten-check <sammlungs-id> --backend local  # Cross-Encoder
 | Option | Bedeutung |
 |---|---|
 | `--backend textstats` | Textstatistik wie in der Web-App (Schwelle 0.60). Standard. |
-| `--backend onnx` | mitgelieferter int8-Cross-Encoder aus `model/`. |
+| `--backend onnx` | mitgelieferter int8-Cross-Encoder aus `model/` (Schwelle 0.25). |
+| `--backend hybrid` | Textstatistik und Cross-Encoder je zur Hälfte (Schwelle 0.40). |
 | `--backend local` | Cross-Encoder `BAAI/bge-reranker-v2-m3` (mehrsprachig, lokal, kostenfrei, Score 0–1, Schwelle 0.30). |
 | `--searches` | gespeicherte Suchen der Widgets angenähert ausführen |
 | `--model` | anderes Modell für `--backend local` |

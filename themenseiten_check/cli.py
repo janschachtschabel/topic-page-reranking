@@ -32,8 +32,9 @@ def _args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("collection_id", nargs="?", help="ID der Sammlung hinter der Themenseite")
     p.add_argument("--search", metavar="BEGRIFF", help="Themenseiten zu einem Begriff auflisten und beenden")
     p.add_argument("--subject", default="", help="Fach für --search, z. B. Physik")
-    p.add_argument("--backend", choices=("textstats", "onnx", "local"), default="textstats",
-                   help="textstats; onnx = mitgelieferter int8-Cross-Encoder; local = sentence-transformers")
+    p.add_argument("--backend", choices=("textstats", "onnx", "hybrid", "local"), default="textstats",
+                   help="textstats; onnx = mitgelieferter int8-Cross-Encoder; hybrid = beides je zur "
+                        "Hälfte; local = sentence-transformers")
     p.add_argument("--model", help=f"nur für --backend local, Vorgabe {DEFAULT_CROSS_ENCODER}")
     p.add_argument("--topic-text", choices=TOPIC_TEXTS, default=DEFAULT_TOPIC_TEXT,
                    help="Woran gemessen wird: Beschreibung, kompendialer Text oder beides")
@@ -80,9 +81,9 @@ async def _run(args: argparse.Namespace) -> int:
         if args.search:
             return await _list_pages(repo, args.search, args.subject)
 
-        if args.backend == "onnx":
-            from .onnx_reranker import OnnxCrossEncoder
-            reranker = OnnxCrossEncoder()
+        if args.backend in ("onnx", "hybrid"):
+            from .onnx_reranker import HybridReranker, OnnxCrossEncoder
+            reranker = OnnxCrossEncoder() if args.backend == "onnx" else HybridReranker()
         elif args.backend == "local":
             reranker = CrossEncoderReranker(args.model or DEFAULT_CROSS_ENCODER)
         else:

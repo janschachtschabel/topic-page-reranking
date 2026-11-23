@@ -167,6 +167,7 @@ footer{color:var(--muted);font-size:.8rem;padding:2rem 1.25rem 3rem;max-width:76
             <select id="backend">
               <option value="textstats" selected>Textstatistik</option>
               <option value="crossencoder">Cross-Encoder (MiniLM, int8)</option>
+              <option value="hybrid">Kombination aus beiden</option>
             </select></label>
           <label>Abgleich mit
             <select id="topictext">
@@ -551,7 +552,7 @@ $("q").onkeydown = $("subject").onkeydown = ev => { if (ev.key === "Enter") { ev
 drawHistory();
 
 function updateHint() {
-  $("cehint").hidden = !($("backend").value === "crossencoder"
+  $("cehint").hidden = !(["crossencoder", "hybrid"].includes($("backend").value)
                          && ["compendium", "both"].includes($("topictext").value));
 }
 $("backend").onchange = $("topictext").onchange = updateHint;
@@ -559,10 +560,11 @@ $("backend").onchange = $("topictext").onchange = updateHint;
 fetch("/api/config").then(r => r.json()).then(cfg => {
   if (cfg.password) $("pwbox").hidden = false;
   const ce = cfg.crossencoder || {};
-  const opt = $("backend").querySelector('option[value="crossencoder"]');
   if (!ce.available) {
-    opt.disabled = true;
-    opt.textContent += " – nicht verfügbar";
+    for (const opt of $("backend").querySelectorAll('option[value="crossencoder"], option[value="hybrid"]')) {
+      opt.disabled = true;
+      opt.textContent += " – nicht verfügbar";
+    }
     $("backend").title = ce.reason || "";
   }
 }).catch(() => {});

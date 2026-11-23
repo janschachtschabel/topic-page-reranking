@@ -15,26 +15,35 @@ text chosen, only its first lines would count. The compendium's headings
 ("Überschriften") or the description are what it should be given.
 
 **What the score means.** msmarco cross-encoders were trained on search
-queries against passages; their raw probabilities for "topic vs. material" sit
-low and vary by page. As with the text statistics, each probability is taken
-relative to the page's median and capped at 1, and a material of a disjoint
-subject is multiplied by 0.4. The default threshold is NOT calibrated --
-nothing in this repository could run the real model when it was written. Mark
-materials in the app; it measures the threshold that fits.
+queries against passages; for "topic vs. material" their logits sit far below
+zero (-1 to -11 on the example pages) and shift from page to page. So the
+logits are placed on the page's own scale: the median material gets 0.5, two
+median absolute deviations above it 1.0, two below it 0.0. A material of a
+disjoint subject is multiplied by 0.4.
+
+**Measured** with the shipped int8 model on the example pages
+(tests/eval_pages.py, description as topic text): ranking AUC 0.88 / 0.82 /
+0.82 without, 0.93 / 0.91 / 0.82 with the subject cap -- behind the text
+statistics on the same pages (1.00 each). Threshold 0.25 keeps 29 of 33
+fitting materials and drops 13 of 18 misfits; at 0.45, the best F1, it would
+drop 10 fitting ones as well -- too many for a review tool. The full compendium text as query was worse
+still (AUC 0.75 / 0.83 / 0.57): the model sees only its first lines. The
+combination with the text statistics (``HybridReranker``) reached AUC 1.00 /
+1.00 / 0.92 and, at 0.40, keeps 32 of 33 and drops 16 of 18. The example pages were written while tuning the text statistics,
+so they favour it; real pages, marked in the app, decide.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import math
 import threading
 from pathlib import Path
 from typing import Any
 
 from .collect import Item, TopicPage
 from .scoring import DEFAULT_TOPIC_TEXT, item_text, topic_texts
-from .textstats import DISJOINT_SUBJECT, _relative, subjects_agree
+from .textstats import DISJOINT_SUBJECT, subjects_agree
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "model"
 #: Tokens the topic side may take of the pair; the material gets the rest.
@@ -119,14 +128,34 @@ def cross_query(topic: TopicPage, source: str) -> str:
     return ". ".join(p.strip().rstrip(".") for p in parts if p.strip())
 
 
-def _sigmoid(x: float) -> float:
-    return 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
+def _manifest_label(model_dir: Path) -> str:
+    """'<model>, <quantization>' from manifest.json -- only a label, so it never fails.
+
+    Read as bytes and decoded leniently: a manifest written on Windows without
+    an explicit encoding is cp1252 (seen 2026-11-23: "Französische" in the
+    sample pairs broke a strict UTF-8 read and with it the whole reranker).
+    """
+    try:
+        meta = json.loads((model_dir / "manifest.json").read_bytes().decode("utf-8", errors="replace"))
+    except (OSError, ValueError):
+        meta = {}
+    model = str(meta.get("model", "ONNX")).rsplit("/", 1)[-1]
+    return f"{model}, {meta.get('quantization', 'int8').split(' ')[0]}"
+
+
+def page_scale(logits: list[float]) -> list[float]:
+    """Logits onto the page's own 0..1 scale: median 0.5, +-2 MAD to 1 and 0."""
+    ordered = sorted(logits)
+    median = ordered[len(ordered) // 2]
+    mad = sorted(abs(x - median) for x in logits)[len(logits) // 2] or 1.0
+    return [min(1.0, max(0.0, 0.5 + 0.25 * (x - median) / mad)) for x in logits]
 
 
 class OnnxCrossEncoder:
     """Scores a page with the shipped int8 cross-encoder."""
 
-    default_threshold = 0.5
+    #: Balanced on the example pages: 29/33 fitting kept, 13/18 misfits dropped.
+    default_threshold = 0.25
 
     def __init__(self, model_dir: Path | None = None) -> None:
         model_dir = model_dir or MODEL_DIR
@@ -134,9 +163,7 @@ class OnnxCrossEncoder:
         if reason:
             raise RuntimeError(reason)
         self._dir = model_dir
-        manifest = model_dir / "manifest.json"
-        meta = json.loads(manifest.read_text()) if manifest.is_file() else {}
-        self.name = f"Cross-Encoder ({meta.get('model', 'ONNX')}, {meta.get('quantization', 'int8')})"
+        self.name = f"Cross-Encoder ({_manifest_label(model_dir)})"
 
     def _run(self, query: str, docs: list[str]) -> list[float]:
         import numpy as np
@@ -163,6 +190,30 @@ class OnnxCrossEncoder:
             return []
         logits = await asyncio.to_thread(self._run, cross_query(topic, source),
                                          [item_text(i) for i in items])
-        relative = _relative([_sigmoid(x) for x in logits])
         return [r * (1.0 if subjects_agree(topic.subjects, i.subjects) else DISJOINT_SUBJECT)
-                for r, i in zip(relative, items)]
+                for r, i in zip(page_scale(logits), items)]
+
+
+class HybridReranker:
+    """Text statistics and cross-encoder, half each.
+
+    The two err differently: the statistics see shared word fragments and the
+    page's cohesion, the model sees meaning across different words. On the
+    example pages the mix ranked better than the model alone (mean AUC 0.97 vs
+    0.84), not better than the statistics alone.
+    """
+
+    #: Best mean F1 on the example pages (0.91): 32/33 kept, 16/18 dropped.
+    default_threshold = 0.4
+
+    def __init__(self, model_dir: Path | None = None) -> None:
+        from .textstats import TextStatsReranker
+        self._stats = TextStatsReranker()
+        self._model = OnnxCrossEncoder(model_dir)
+        self.name = f"Kombination: Textstatistik + {self._model.name}"
+
+    async def score_page(self, topic: TopicPage, items: list[Item],
+                         source: str = DEFAULT_TOPIC_TEXT) -> list[float]:
+        stats = await self._stats.score_page(topic, items, source)
+        model = await self._model.score_page(topic, items, source)
+        return [0.5 * a + 0.5 * b for a, b in zip(stats, model)]

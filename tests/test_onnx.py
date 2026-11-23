@@ -141,6 +141,13 @@ def test_cross_encoder_scores_a_page(model_dir):
     scores = asyncio.run(reranker.score_page(topic, items))
     assert min(scores[:3]) > max(scores[3:])
     assert scores[3] <= 0.4                          # disjoint subject capped
+    hybrid = asyncio.run(onnx_reranker.HybridReranker(out).score_page(topic, items))
+    assert min(hybrid[:3]) > max(hybrid[3:])
+
+
+def test_page_scale_centres_the_median():
+    assert onnx_reranker.page_scale([-1.0, -2.0, -3.0, -9.0]) == [0.75, 0.5, 0.25, 0.0]
+    assert onnx_reranker.page_scale([-4.0, -4.0]) == [0.5, 0.5]
 
 
 def test_prepare_compare_reports_both_precisions(model_dir):

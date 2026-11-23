@@ -128,16 +128,21 @@ def test_endpoint_scores_with_text_statistics(monkeypatch):
                                     json={"url": ID, "topic_text": "x"}).status_code == 422
 
 
-def test_config_reports_password_and_cross_encoder(monkeypatch):
+def test_config_reports_password_and_cross_encoder(monkeypatch, tmp_path):
+    from themenseiten_check import onnx_reranker
+    monkeypatch.setattr(onnx_reranker, "MODEL_DIR", tmp_path)       # no model here
     cfg = TestClient(_load_app(monkeypatch).app).get("/api/config").json()
     assert cfg["password"] is False
-    assert cfg["crossencoder"]["available"] is False            # no model/ in the test checkout
+    assert cfg["crossencoder"]["available"] is False
     assert "Modell nicht ausgeliefert" in cfg["crossencoder"]["reason"]
     mod = _load_app(monkeypatch, DEMO_PASSWORD="x")
     assert TestClient(mod.app).get("/api/config").json()["password"] is True
 
 
-def test_cross_encoder_request_without_model_is_refused(monkeypatch):
+@pytest.mark.parametrize("backend", ["crossencoder", "hybrid"])
+def test_cross_encoder_request_without_model_is_refused(monkeypatch, tmp_path, backend):
+    from themenseiten_check import onnx_reranker
+    monkeypatch.setattr(onnx_reranker, "MODEL_DIR", tmp_path)
     mod = _load_app(monkeypatch)
 
     async def fake_load(repo, cid, **kw):
@@ -145,7 +150,7 @@ def test_cross_encoder_request_without_model_is_refused(monkeypatch):
 
     monkeypatch.setattr(mod, "_repository", FakeRepo)
     monkeypatch.setattr(mod, "load_topic_page", fake_load)
-    res = TestClient(mod.app).post("/api/analyze", json={"url": ID, "backend": "crossencoder"})
+    res = TestClient(mod.app).post("/api/analyze", json={"url": ID, "backend": backend})
     assert res.status_code == 503 and "Cross-Encoder nicht verfügbar" in res.json()["error"]
 
 

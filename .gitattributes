@@ -1,0 +1,6 @@
+# Text stays LF in the repository and on Vercel, whatever the checkout OS.
+* text=auto eol=lf
+# The model: never converted, never diffed.
+model/** -text -diff
+*.onnx binary
+*.bin binary
