@@ -23,6 +23,7 @@ from typing import Any
 from edusharing import AsyncRepository, EduSharingError
 
 from .saved_search import run_saved_search
+from .topic_text import collection_description, plain_text
 
 KEYWORD_PROP = "cclom:general_keyword"
 #: Page size for collection listings and describe_many (its own cap is 50).
@@ -72,6 +73,9 @@ class TopicPage:
     #: WLO) -- usually far more telling about the topic than the description.
     #: Read from the metadata profile, so another metadata set can name its own.
     compendium: str = ""
+    #: Where the description was found -- shown, so it can be checked against
+    #: other tools reading the same collection. Empty when none was found.
+    description_source: str = ""
     #: Subject labels of the collection (``fields.subject`` of ``describe``).
     subjects: tuple[str, ...] = ()
 
@@ -97,7 +101,7 @@ def _compendium(repo: AsyncRepository, meta: dict[str, Any]) -> str:
     value = (meta.get("properties") or {}).get(prop) if prop else None
     if isinstance(value, list):
         value = value[0] if value else None
-    return value.strip() if isinstance(value, str) else ""
+    return plain_text(value) if isinstance(value, str) else ""
 
 
 class _Builder:
@@ -236,9 +240,19 @@ async def load_topic_page(repo: AsyncRepository, collection_id: str, *,
             left -= len(found)
             builder.add_lane(f"Untersammlung „{sub['title']}“", "untersammlung", found)
 
+    description = await collection_description(repo, collection_id, builder.notes)
+    source = "collection.description" if description else ""
+    if not description:
+        description = plain_text(meta.get("description") or "")
+        source = "Eigenschaften (cclom:general_description/cm:description)" if description else ""
+    if not description:
+        # Said, because the portal may still show a text: then it lives in
+        # WordPress, not in the repository, and this is where to look next.
+        builder.notes.append("Keine Beschreibung im Repositorium gefunden (geprüft: "
+                             "collection.description, cclom:general_description, cm:description).")
     return TopicPage(
         id=meta["id"], title=meta["title"],
-        description=(meta.get("description") or "").strip(),
+        description=description, description_source=source,
         keywords=tuple(meta.get("keywords") or ()), url=meta.get("url") or "",
         compendium=_compendium(repo, meta),
         subjects=tuple((meta.get("fields") or {}).get("subject") or ()),

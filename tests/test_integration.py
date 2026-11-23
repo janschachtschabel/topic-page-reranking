@@ -62,6 +62,10 @@ MATERIALS = [_io("r1", "Bruchrechnen üben", "Brüche kürzen", original="o1"),
 
 def handler(request: httpx.Request) -> httpx.Response:
     path = request.url.path
+    if path.endswith("/collection/v1/collections/-home-/col"):
+        # The collection DTO: where a collection's description really lives.
+        return httpx.Response(200, json={"collection": {**NODES["col"], "collection": {
+            "description": "Licht, Spiegel und Linsen", "type": "default"}}})
     if path.endswith("/col/children/collections"):
         return httpx.Response(200, json={"collections": [], "pagination": {"total": 0}})
     if path.endswith("/col/children") and request.url.params.get("filter") == "files":
@@ -97,7 +101,8 @@ def test_end_to_end_through_the_client():
 
     topic = asyncio.run(go())
     assert topic.title == "Optik"
-    assert "Brechung und Linsen" in topic.description
+    assert topic.description == "Licht, Spiegel und Linsen"    # DTO beats properties
+    assert topic.description_source == "collection.description"
     assert topic.compendium == "Die Optik untersucht das Licht."
     assert [(lane.heading, lane.item_ids) for lane in topic.lanes] == [
         ("Empfohlen", ("n9",)), ("Inhalte der Sammlung", ("o1", "o2"))]

@@ -57,11 +57,25 @@ class FakeProfile:
     compendium_property = "ccm:oeh_collection_compendium_text"
 
 
+class FakeRaw:
+    """The collection endpoint: no description unless a test sets one."""
+
+    def __init__(self, description=None, error=None):
+        self.description, self.error = description, error
+
+    async def json(self, method, path):
+        if self.error:
+            raise self.error
+        coll = {} if self.description is None else {"description": self.description}
+        return {"collection": {"ref": {"id": "c"}, "collection": coll}}
+
+
 class FakeRepo:
     metadata_profile = FakeProfile()
 
-    def __init__(self, flows):
+    def __init__(self, flows, raw=None):
         self.flows = flows
+        self.raw = raw or FakeRaw()
 
 
 class FixedReranker:
@@ -194,3 +208,38 @@ def test_topic_texts_fall_back_and_say_so():
     assert topic_texts(TopicPage("t", "T", "", (), "", ()), "both") == ([], "none")
     with pytest.raises(ValueError):
         topic_texts(full, "x")
+
+
+
+def test_description_comes_from_the_collection_endpoint_first():
+    flows = FakeFlows({"c": [hit(1, "Licht")]})
+    topic = run(load_topic_page(FakeRepo(flows, FakeRaw("<p>Alles über <b>Licht</b>.</p>")), "c"))
+    assert "Licht" in topic.description and "<" not in topic.description
+
+
+def test_description_falls_back_and_notes_a_refusal():
+    from edusharing import EduSharingError
+    flows = FakeFlows({"c": [hit(1, "Licht")]})
+    topic = run(load_topic_page(FakeRepo(flows, FakeRaw(error=EduSharingError("403"))), "c"))
+    assert topic.description == "Licht, Reflexion, Brechung und Linsen."   # from describe
+    assert topic.description_source.startswith("Eigenschaften")
+    assert any("Beschreibung der Sammlung nicht lesbar" in n for n in topic.notes)
+
+
+def test_missing_description_is_noted():
+    class NoDescription(FakeFlows):
+        async def describe(self, cid):
+            return {"id": cid, "title": "Optik", "url": "", "description": "", "keywords": []}
+    topic = run(load_topic_page(FakeRepo(NoDescription({"c": []})), "c"))
+    assert topic.description == ""
+    assert any("Keine Beschreibung im Repositorium" in n for n in topic.notes)
+
+
+def test_plain_text_drops_markdown_and_table_of_contents():
+    from themenseiten_check.topic_text import plain_text
+    md = ("::: inhaltsverzeichnis\n## Inhaltsverzeichnis\n\n"
+          "- [Kompendialer Text](#kompendialer-text)\n- [Teil 1](#teil-1)\n:::\n"
+          "## 1\\. Themendefinition\nDie **Optik** ist die Lehre vom [Licht](https://x.org).\n")
+    out = plain_text(md)
+    assert "Inhaltsverzeichnis" not in out and "#" not in out and "](" not in out
+    assert "Die Optik ist die Lehre vom Licht." in out and "1. Themendefinition" in out

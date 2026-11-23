@@ -4,123 +4,201 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Themenseiten-Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#1b2f5b;--paper:#f7f9fc;--line:#d9dfea;--muted:#5d6678;--card:#fff;
---keep:#2e7d5b;--drop:#b4432f;--accent:#2756a8;--lane:#eef2f9;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--ink:#dfe7f7;--paper:#0f1828;--line:#2c3a55;
---muted:#9aa6bd;--card:#16223a;--keep:#6cc59b;--drop:#ef8a75;--accent:#8fb2f0;--lane:#132036;color-scheme:dark}}
+:root{
+  --navy:#0b2f63;--navy-deep:#082450;--paper:#eef3f9;--surface:#fff;--ink:#13223d;
+  --muted:#5b6780;--line:#d6deea;--lime:#dde83c;--keep:#1d7a57;--drop:#b3412f;
+  --keep-soft:#e4f3ec;--drop-soft:#f8e7e3;--lane:#f7f9fc;
+  --head:"Montserrat","Segoe UI",system-ui,sans-serif;
+  --body:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  color-scheme:light}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#0d1626;--surface:#15223a;--ink:#e3eaf7;--muted:#9ba8c0;--line:#2a3a58;
+  --keep:#5fc298;--drop:#ef8b76;--keep-soft:#173327;--drop-soft:#3a201c;--lane:#111d31;color-scheme:dark}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif}
+html{scroll-padding-top:5rem}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--body)}
+a{color:inherit;text-underline-offset:.18em;text-decoration-thickness:1px}
+:focus-visible{outline:3px solid var(--lime);outline-offset:2px;border-radius:4px}
+button{font:600 .95rem/1 var(--head);border:0;border-radius:999px;cursor:pointer;padding:.7rem 1.3rem}
+button:disabled{opacity:.6;cursor:progress}
+input,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.55rem .75rem}
 .wrap{max-width:76rem;margin:auto;padding:0 1.25rem}
-form{padding:1.5rem 0 1rem;border-bottom:1px solid var(--line)}
+
+/* Band: the tool lives on the WLO navy, like the portal pages it checks. */
+.band{background:linear-gradient(var(--navy),var(--navy-deep));color:#fff;padding:1.4rem 0 4.5rem}
+.brand{display:flex;align-items:baseline;gap:.75rem;margin-bottom:1rem}
+.brand b{font:700 1.15rem/1 var(--head);letter-spacing:.01em}
+.brand span{color:#b9c8e3;font-size:.85rem}
 .ask{display:flex;gap:.5rem}
-.ask input{flex:1;min-width:0;font:inherit;padding:.6rem .8rem;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
-button{font:inherit;font-weight:600;padding:.6rem 1.2rem;border:0;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}
-@media (prefers-color-scheme:dark){button{color:#0f1828}}
-button:disabled{opacity:.6;cursor:wait}
-.opts{display:flex;flex-wrap:wrap;gap:.4rem 1.25rem;margin-top:.75rem;color:var(--muted);font-size:.9rem}
-.opts label{display:flex;gap:.35rem;align-items:center}
-select,.opts input[type=password]{font:inherit;padding:.2rem .4rem;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--ink)}
-.examples{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.75rem;color:var(--muted);font-size:.9rem}
-.examples button{background:var(--card);color:var(--accent);border:1px solid var(--accent);font-weight:600;font-size:.85rem;padding:.3rem .7rem}
-.used{display:inline-block;font-size:.75rem;color:var(--keep);border:1px solid var(--keep);border-radius:3px;padding:0 .35rem;margin-left:.4rem;vertical-align:middle}
-.history{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.75rem}
-.history button{background:var(--lane);color:var(--ink);font-weight:400;font-size:.85rem;padding:.25rem .6rem}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.status{padding:1rem 0;color:var(--muted)}
-.status.error{color:var(--drop)}
-.choices{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
-form.find{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.75rem 0;border-bottom:1px solid var(--line);color:var(--muted);font-size:.9rem}
-form.find input{font:inherit;padding:.4rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
-form.find input#q{flex:1;min-width:10rem}
-form.find button{padding:.4rem .9rem}
-#results ul{list-style:none;margin:.5rem 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.5rem}
-#results li button{width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);font-weight:400;padding:.5rem .7rem}
-#results li strong{display:block}
-.tag{display:inline-block;font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 .35rem;margin:.25rem .25rem 0 0}
+.ask input{flex:1;min-width:0;padding:.85rem 1rem;border:0;border-radius:999px;font-size:1rem}
+.go{background:var(--lime);color:var(--navy-deep)}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.8rem;font-size:.85rem;color:#b9c8e3}
+.chips button{background:rgba(255,255,255,.1);color:#fff;font:500 .82rem/1 var(--head);padding:.45rem .8rem;border:1px solid rgba(255,255,255,.25)}
+.chips button:hover{background:rgba(255,255,255,.2)}
+.more{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;margin-top:.9rem}
+.more>details>summary{cursor:pointer;color:#dfe7f5;font:600 .85rem/1.4 var(--head);list-style:none}
+.more>details>summary::before{content:"▸ ";color:var(--lime)}
+.more>details[open]>summary::before{content:"▾ "}
+.panel{margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.6rem 1.25rem;align-items:center;font-size:.9rem;color:#dfe7f5}
+.panel label{display:flex;gap:.4rem;align-items:center}
+.panel input[type=checkbox]{accent-color:var(--lime);width:1rem;height:1rem}
+.find input#q{flex:1;min-width:12rem}
+.find button{background:#fff;color:var(--navy);padding:.55rem 1rem}
+#results ul{list-style:none;margin:.75rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));gap:.5rem}
+#results li button{width:100%;text-align:left;background:#fff;color:var(--ink);border-radius:10px;font:400 .9rem/1.3 var(--body);padding:.6rem .8rem}
+#results li strong{display:block;font:600 .95rem/1.3 var(--head);margin-bottom:.3rem}
+.tag{display:inline-block;font-size:.72rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:.05rem .5rem;margin:.15rem .25rem 0 0}
 .tag.yes{color:var(--keep);border-color:var(--keep)}
-details.comp{max-width:48rem;margin:0 0 .75rem}
-details.comp summary{cursor:pointer;color:var(--muted)}
-details.comp p{white-space:pre-line;margin:.4rem 0 0;border-left:3px solid var(--ink);padding:.2rem 0 .2rem 1rem}
-header.topic{padding:2rem 0 1rem}
-h1{font:600 2rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 .75rem}
-h1 a{color:inherit;text-underline-offset:.2em;text-decoration-thickness:1px}
-.small{color:var(--muted);font-size:.9rem;margin:.25rem 0}
-.cut{display:flex;align-items:center;gap:.75rem;margin:1rem 0 0;flex-wrap:wrap}
-.cut input{width:14rem;accent-color:var(--accent)}
-.cut strong{font-variant-numeric:tabular-nums}
-.notes{margin:.75rem 0 0;padding-left:1.2rem;color:var(--muted);font-size:.9rem}
-section.lane{background:var(--lane);border-radius:8px;padding:1rem 1rem .5rem;margin:1.25rem 0}
-.lane h2{font:600 1.2rem/1.3 Georgia,serif;margin:0}
-.kind{font:400 .8rem/1 "Segoe UI",system-ui,sans-serif;color:var(--muted);margin-left:.5rem}
-.widgets{margin:.3rem 0 .75rem;padding:0;list-style:none;color:var(--muted);font-size:.85rem}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-@media (max-width:52rem){.cols{grid-template-columns:1fr}}
-h3{font-size:.95rem;margin:0 0 .4rem}
-ol{list-style:none;margin:0 0 .5rem;padding:0}
-li.m{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--keep);border-radius:6px;padding:.45rem .7rem;margin-bottom:.4rem}
-li.m.drop{border-left-color:var(--drop)}
-li.m.drop .t{text-decoration:line-through;text-decoration-color:var(--drop)}
-.row{display:flex;gap:.5rem;align-items:baseline}
-.t{flex:1;font-weight:600}
-.t a{color:inherit}
-.sc{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.85rem}
-.mv{font-size:.8rem;font-variant-numeric:tabular-nums}.up{color:var(--keep)}.dn{color:var(--drop)}
-.bar{position:relative;height:4px;background:var(--line);border-radius:2px;margin-top:.35rem}
+
+.status:not(:empty){margin-top:1rem}
+.status>div{background:var(--surface);color:var(--ink);border-radius:12px;padding:.9rem 1.2rem}
+.status.error>div{border-left:4px solid var(--drop)}
+.loading{display:flex;align-items:center;gap:.75rem}
+.loading::before{content:"";width:1.1rem;height:1.1rem;border-radius:50%;border:3px solid var(--line);border-top-color:var(--navy);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(1turn)}}
+@media (prefers-reduced-motion:reduce){.loading::before{animation:none}}
+.choices{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem}
+.choices button{background:var(--navy);color:#fff;padding:.5rem .9rem}
+
+/* Sheet: the topic, overlapping the band like a portal page. */
+.sheet{background:var(--surface);border-radius:18px;margin:-3rem auto 0;max-width:76rem;padding:1.75rem 2rem 1.5rem;box-shadow:0 6px 30px rgba(8,36,80,.12)}
+.sheet .kicker{color:var(--muted);font-size:.85rem;margin:0}
+.sheet h1{font:700 clamp(1.8rem,3.5vw,2.6rem)/1.15 var(--head);margin:.15rem 0 .5rem}
+.meta{color:var(--muted);font-size:.9rem;margin:0 0 .9rem}
+.texts{display:grid;grid-template-columns:minmax(0,1fr);gap:.5rem;max-width:52rem}
+.texts details{min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--lane)}
+.texts summary{cursor:pointer;padding:.55rem .85rem;font:600 .9rem/1.4 var(--head);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.texts summary .peek{font:400 .85rem/1.4 var(--body);color:var(--muted);flex:1 1 0;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.texts details[open] .peek{display:none}
+.texts p{margin:0;padding:0 .85rem .8rem;white-space:pre-line;max-width:72ch}
+.used{font:600 .7rem/1.4 var(--head);color:var(--navy-deep);background:var(--lime);border-radius:999px;padding:.05rem .55rem}
+.fallback{color:var(--drop);font-size:.85rem;margin:.25rem 0 0}
+.notes summary{cursor:pointer;color:var(--muted);font-size:.85rem;margin-top:.9rem}
+.notes ul{margin:.3rem 0 0;padding-left:1.2rem;color:var(--muted);font-size:.85rem}
+
+/* The verdict bar stays in view while scrolling through the lanes. */
+.verdict{position:sticky;top:0;z-index:5;margin:1rem 0 0;padding:.6rem 1.25rem;background:linear-gradient(var(--paper) 60%,transparent)}
+.verdict>div{max-width:76rem;margin:auto;background:var(--surface);border-radius:12px;padding:.75rem 1.5rem;display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 2rem;box-shadow:0 4px 18px rgba(8,36,80,.14)}
+.verdict .count{font:700 1.05rem/1.2 var(--head)}
+.verdict .count mark{background:var(--lime);color:var(--navy-deep);padding:.1rem .45rem;border-radius:6px}
+.verdict label{display:flex;align-items:center;gap:.6rem;font-size:.9rem;color:var(--muted)}
+.verdict input[type=range]{width:min(16rem,50vw);accent-color:var(--navy)}
+@media (prefers-color-scheme:dark){.verdict input[type=range]{accent-color:var(--lime)}}
+.verdict output{font:700 .95rem/1 var(--head);color:var(--ink);font-variant-numeric:tabular-nums;min-width:2.5rem}
+.verdict .how{color:var(--muted);font-size:.8rem;margin-left:auto}
+
+main.lanes{max-width:76rem;margin:.5rem auto 0;padding:0 1.25rem}
+section.lane{background:var(--surface);border-radius:14px;padding:1.1rem 1.25rem .6rem;margin-bottom:1rem;box-shadow:0 1px 4px rgba(8,36,80,.06)}
+.lane-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem 1rem;margin-bottom:.2rem}
+.lane h2{font:700 1.15rem/1.3 var(--head);margin:0}
+.lane .kind{font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:.05rem .55rem}
+.lane .tally{font-size:.85rem;color:var(--muted);margin-left:auto}
+.lane .tally b{color:var(--drop)}
+.widgets summary{cursor:pointer;font-size:.8rem;color:var(--muted)}
+.widgets ul{margin:.2rem 0 0;padding-left:1.1rem;font-size:.8rem;color:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:.7rem}
+@media (max-width:54rem){.cols{grid-template-columns:1fr}.sheet{padding:1.4rem 1.1rem 1rem;border-radius:14px}.verdict{padding:.5rem .6rem}.verdict>div{padding:.6rem 1rem}.verdict .how{display:none}}
+h3{font:600 .85rem/1.3 var(--head);color:var(--muted);margin:0 0 .45rem}
+ol{list-style:none;margin:0 0 .6rem;padding:0}
+li.m{position:relative;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--keep);border-radius:8px;padding:.5rem .7rem .55rem;margin-bottom:.4rem}
+li.m.drop{border-left-color:var(--drop);background:var(--drop-soft)}
+li.m.drop .t{text-decoration:line-through;text-decoration-color:var(--drop);color:var(--muted)}
+.row{display:flex;gap:.55rem;align-items:baseline}
+.rk{color:var(--muted);font-size:.8rem;min-width:1.6rem;text-align:right;font-variant-numeric:tabular-nums}
+.t{flex:1;font-weight:600;line-height:1.35}
+.sc{font:600 .78rem/1 var(--head);font-variant-numeric:tabular-nums;border-radius:999px;padding:.25rem .5rem;background:var(--keep-soft);color:var(--keep)}
+li.drop .sc{background:var(--surface);color:var(--drop)}
+.mv{font-size:.75rem;font-variant-numeric:tabular-nums}.up{color:var(--keep)}.dn{color:var(--drop)}
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .75rem;margin:.35rem 0 0 2.15rem}
+.bar{position:relative;flex:1;min-width:6rem;height:3px;background:var(--line);border-radius:2px}
 .bar span{display:block;height:100%;border-radius:2px;background:var(--keep)}
 li.drop .bar span{background:var(--drop)}
-.bar i{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--muted)}
-details.d{font-size:.85rem;color:var(--muted);margin-top:.25rem;white-space:pre-line}
+.bar i{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55}
+details.d{font-size:.78rem;color:var(--muted);white-space:pre-line}
+details.d[open]{flex-basis:100%;order:2;font-size:.82rem}
 details.d summary{cursor:pointer}
-details.out>summary{cursor:pointer;font-weight:600;font-size:.95rem;margin:.25rem 0 .5rem}
-.empty{color:var(--muted);font-style:italic;font-size:.9rem;margin:0 0 .75rem}
-footer{color:var(--muted);font-size:.85rem;padding:2rem 0}
+details.out>summary{cursor:pointer;font:600 .85rem/1.3 var(--head);color:var(--drop);margin:.2rem 0 .5rem}
+.empty{color:var(--muted);font-style:italic;font-size:.9rem;margin:.4rem 0 .8rem}
+.intro{max-width:76rem;margin:-3rem auto 0;padding:0 1.25rem}
+.intro div{background:var(--surface);border-radius:18px;padding:1.5rem 2rem;box-shadow:0 6px 30px rgba(8,36,80,.12);max-width:46rem}
+.intro h2{font:700 1.2rem/1.3 var(--head);margin:0 0 .4rem}
+.intro p{margin:.3rem 0;color:var(--muted)}
+footer{color:var(--muted);font-size:.8rem;padding:2rem 1.25rem 3rem;max-width:76rem;margin:auto}
 </style>
 </head>
 <body>
+<div class="band">
 <div class="wrap">
-<form id="f">
-  <div class="ask">
-    <input id="url" type="text" required value="https://wordpress.staging.openeduhub.net/portal/physik-optik/" placeholder="URL der Themenseite oder Sammlungs-ID" aria-label="URL der Themenseite">
-    <button id="go" type="submit">Prüfen</button>
-  </div>
-  <div class="examples" aria-label="Beispiele">
-    <span>Beispiele:</span>
-    <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/physik-optik/">Physik: Optik</button>
-    <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/mathematik-r%c3%a4umliche-und-ebene-geometrie/">Mathematik: Räumliche und ebene Geometrie</button>
-    <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/informatik-technische-informatik/">Informatik: Technische Informatik</button>
-  </div>
-  <div class="opts">
-    <label>Abgleich mit
-      <select id="topictext">
-        <option value="description" selected>Beschreibung der Themenseite</option>
-        <option value="compendium">kompendialem Text</option>
-        <option value="both">beidem</option>
-      </select></label>
-    <label><input type="checkbox" id="searches" checked> gespeicherte Suchen annähern</label>
-    <label><input type="checkbox" id="subs" checked> Unterthemen einbeziehen</label>
-    <label id="pwbox" hidden>Passwort <input type="password" id="pw" autocomplete="current-password"></label>
-  </div>
-  <div class="history" id="history" aria-label="Zuletzt geprüft"></div>
-</form>
-<form id="sf" class="find">
-  <span>Oder Themenseite suchen</span>
-  <input id="q" type="text" required placeholder="Thema, z. B. Optik" aria-label="Thema">
-  <input id="subject" type="text" placeholder="Fach (optional)" aria-label="Fach">
-  <button type="submit" id="sgo">Suchen</button>
-</form>
-<div id="results"></div>
-<div id="status" class="status" role="status"></div>
-<div id="out"></div>
-<footer>Liest nur, schreibt nichts. Die Schwelle verschiebt sich im Browser, ohne neu zu bewerten.</footer>
+  <div class="brand"><b>Themenseiten-Check</b><span>WLO Staging, liest nur</span></div>
+  <form id="f">
+    <div class="ask">
+      <input id="url" type="text" required value="https://wordpress.staging.openeduhub.net/portal/physik-optik/"
+             placeholder="URL der Themenseite oder Sammlungs-ID" aria-label="URL der Themenseite">
+      <button id="go" class="go" type="submit">Prüfen</button>
+    </div>
+    <div class="chips examples" aria-label="Beispiele">
+      <span>Beispiele</span>
+      <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/physik-optik/">Physik: Optik</button>
+      <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/mathematik-r%c3%a4umliche-und-ebene-geometrie/">Mathematik: Räumliche und ebene Geometrie</button>
+      <button type="button" data-url="https://wordpress.staging.openeduhub.net/portal/informatik-technische-informatik/">Informatik: Technische Informatik</button>
+    </div>
+    <div class="chips" id="historybox" hidden><span>Zuletzt</span><span id="history" class="chips" style="margin:0"></span></div>
+    <div class="more">
+      <details>
+        <summary>Optionen</summary>
+        <div class="panel">
+          <label>Abgleich mit
+            <select id="topictext">
+              <option value="description" selected>Beschreibung der Themenseite</option>
+              <option value="compendium">kompendialem Text</option>
+              <option value="both">beidem</option>
+            </select></label>
+          <label><input type="checkbox" id="searches" checked> gespeicherte Suchen annähern</label>
+          <label><input type="checkbox" id="subs" checked> Unterthemen einbeziehen</label>
+        </div>
+      </details>
+      <details id="findbox">
+        <summary>Themenseite suchen</summary>
+        <div class="panel find">
+          <input id="q" type="text" placeholder="Thema, z. B. Optik" aria-label="Thema">
+          <input id="subject" type="text" placeholder="Fach (optional)" aria-label="Fach">
+          <button type="button" id="sgo">Suchen</button>
+        </div>
+        <div id="results"></div>
+      </details>
+      <label id="pwbox" class="panel" hidden style="margin:0">Passwort <input type="password" id="pw" autocomplete="current-password"></label>
+    </div>
+  </form>
+  <div id="status" class="status" role="status"></div>
 </div>
+</div>
+
+<div id="intro" class="intro"><div>
+  <h2>Passt der Inhalt zum Thema?</h2>
+  <p>Die App liest eine Themenseite mit ihren Schwimmlinien und Unterthemen und
+  zeigt jede Schwimmlinie zweimal: wie sie heute ist und nach dem Reranking, das
+  unpassende Inhalte aussortiert.</p>
+  <p>Gemessen wird per Textstatistik gegen den Text der Themenseite, kostenfrei
+  und ohne KI-Modell. Mit „Prüfen“ startet die vorausgefüllte Optik-Seite.</p>
+</div></div>
+<div id="out"></div>
+<footer>Liest nur, schreibt nichts. Die Schwelle wirkt sofort im Browser, ohne neu zu bewerten.</footer>
 
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 const HISTORY_KEY = "themenseiten-check:history";
+const KINDS = {seite: "Schwimmlinie", sammlung: "direkt zugeordnet", untersammlung: "Unterthema"};
+const TEXT_NAMES = {description: "Beschreibung", compendium: "kompendialer Text"};
 let data = null;
+// Which <details> the reader opened, by key -- the lanes are redrawn on every
+// slider move and must not snap shut under the reader's hand.
+const opened = new Set();
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -134,41 +212,103 @@ function link(text, url) {
   return /^https?:\/\//.test(url || "")
     ? el("a", {href: url, target: "_blank", rel: "noopener"}, text) : document.createTextNode(text);
 }
+function remembered(key, summary, ...body) {
+  const d = el("details", opened.has(key) ? {open: ""} : {}, summary, ...body);
+  d.addEventListener("toggle", () => d.open ? opened.add(key) : opened.delete(key));
+  return d;
+}
+function setStatus(kind, ...content) {
+  $("status").className = "status" + (kind === "error" ? " error" : "");
+  $("status").replaceChildren(...(content.length ? [el("div", kind === "loading" ? {class: "loading"} : {}, ...content)] : []));
+}
 
 function readHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
 }
 function remember(url, title) {
-  const list = [{url, title}, ...readHistory().filter(h => h.url !== url)].slice(0, 8);
+  const list = [{url, title}, ...readHistory().filter(h => h.url !== url)].slice(0, 6);
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch {}
   drawHistory();
 }
 function drawHistory() {
-  const box = $("history");
-  box.replaceChildren(...readHistory().map(h => {
+  const list = readHistory();
+  $("historybox").hidden = !list.length;
+  $("history").replaceChildren(...list.map(h => {
     const b = el("button", {type: "button", title: h.url}, h.title);
-    b.onclick = () => { $("url").value = h.url; $("f").requestSubmit(); };
+    b.onclick = () => { $("url").value = h.url; run(h.url); };
     return b;
   }));
 }
 
+// --- Topic sheet: drawn once per result, so opened texts stay open. -------
+
+function topicTexts(t, choice) {
+  const used = choice.used === "both" ? ["description", "compendium"] : [choice.used];
+  const box = el("div", {class: "texts"});
+  for (const key of ["description", "compendium"]) {
+    const text = t[key];
+    if (!text) continue;
+    const summary = el("summary", {}, key === "description" ? "Beschreibung" : "Kompendialer Text",
+      used.includes(key) ? el("span", {class: "used"}, "für den Abgleich genutzt") : null,
+      el("span", {class: "peek"}, text));
+    box.append(el("details", {}, summary, el("p", {}, text)));
+  }
+  const fellBack = choice.used !== choice.chosen && choice.chosen !== "both";
+  // The fallback line already names the missing chosen text; say each gap once.
+  const missing = ["description", "compendium"].filter(k => !t[k] && !(fellBack && k === choice.chosen))
+    .map(k => TEXT_NAMES[k]);
+  if (missing.length) box.append(el("p", {class: "meta", style: "margin:0"}, `Nicht hinterlegt: ${missing.join(", ")}.`));
+  if (fellBack) {
+    box.append(el("p", {class: "fallback"}, `Kein Text „${TEXT_NAMES[choice.chosen]}“ hinterlegt – ` +
+      (choice.used === "none" ? "gemessen wird nur an Titel und Schlagworten."
+                              : `stattdessen ${TEXT_NAMES[choice.used] || "beides"} genutzt.`)));
+  }
+  return box;
+}
+
+function drawSheet() {
+  const t = data.topic;
+  const meta = [t.keywords.length ? "Schlagworte: " + t.keywords.join(", ") + "." : null,
+                `Sammlung ${t.id}.`,
+                t.description_source ? `Beschreibung aus ${t.description_source}.` : null].filter(Boolean);
+  const slider = el("input", {type: "range", id: "cut", min: "0", max: "1", step: "0.01",
+                              value: String(data.threshold), "aria-label": "Schwelle für passend"});
+  slider.oninput = drawLanes;
+  const sheet = el("div", {class: "sheet"},
+    el("p", {class: "kicker"}, "Themenseite"),
+    el("h1", {}, link(t.title, t.url)),
+    meta.length ? el("p", {class: "meta"}, meta.join(" ")) : null,
+    topicTexts(t, data.topic_text));
+  if (data.notes.length) {
+    sheet.append(el("details", {class: "notes"}, el("summary", {}, `Hinweise zur Vollständigkeit (${data.notes.length})`),
+      el("ul", {}, ...data.notes.map(n => el("li", {}, n)))));
+  }
+  const verdict = el("div", {class: "verdict"}, el("div", {},
+    el("span", {class: "count", id: "count"}),
+    el("label", {}, "Schwelle", slider, el("output", {id: "cutval"})),
+    el("span", {class: "how"}, data.backend)));
+  $("out").replaceChildren(sheet, verdict, el("main", {class: "lanes", id: "lanes"}));
+  drawLanes();
+}
+
+// --- Lanes: redrawn on every slider move. ----------------------------------
+
 function entry(id, rank, cut, moved) {
   const m = data.items[id];
   const keep = m.score >= cut;
-  const row = el("div", {class: "row"}, el("span", {class: "t"}, link(m.title, m.url)));
-  if (moved !== undefined && moved !== 0) {
-    row.append(el("span", {class: "mv " + (moved > 0 ? "up" : "dn"), title: "Platzänderung in dieser Schwimmlinie"},
-      (moved > 0 ? "▲" : "▼") + Math.abs(moved)));
-  }
-  row.append(el("span", {class: "sc"}, m.score.toFixed(2)));
+  const row = el("div", {class: "row"}, el("span", {class: "rk"}, String(rank)),
+    el("span", {class: "t"}, link(m.title, m.url)));
+  if (moved) row.append(el("span", {class: "mv " + (moved > 0 ? "up" : "dn"), title: "Platzänderung in dieser Schwimmlinie"},
+    (moved > 0 ? "▲" : "▼") + Math.abs(moved)));
+  row.append(el("span", {class: "sc", title: keep ? "passt" : "unter der Schwelle"}, m.score.toFixed(2)));
   const bar = el("div", {class: "bar"},
     el("span", {style: `width:${Math.round(Math.min(1, Math.max(0, m.score)) * 100)}%`}),
-    el("i", {style: `left:${Math.round(cut * 100)}%`, title: "Schwelle"}));
-  const li = el("li", {class: "m" + (keep ? "" : " drop")}, row, bar);
+    el("i", {style: `left:${Math.round(cut * 100)}%`}));
+  const foot = el("div", {class: "foot"}, bar);
   const extra = [m.subjects.length ? "Fach: " + m.subjects.join(", ") : null, m.description || null,
                  m.keywords.length ? "Schlagworte: " + m.keywords.join(", ") : null].filter(Boolean);
-  if (extra.length) li.append(el("details", {class: "d"}, el("summary", {}, "Details"), extra.join("\n\n")));
-  return li;
+  if (extra.length) foot.append(el("details", {class: "d"}, el("summary", {}, "Details"), extra.join("\n")));
+  return el("li", {class: "m" + (keep ? "" : " drop")}, row, foot);
 }
 
 function lane(l, cut) {
@@ -176,11 +316,18 @@ function lane(l, cut) {
   const ranked = [...ids].sort((a, b) => data.items[b].score - data.items[a].score || ids.indexOf(a) - ids.indexOf(b));
   const kept = ranked.filter(id => data.items[id].score >= cut);
   const dropped = ids.filter(id => data.items[id].score < cut);
-  const kinds = {seite: "Schwimmlinie", sammlung: "direkt zugeordnet", untersammlung: "Untersammlung"};
 
-  const sec = el("section", {class: "lane"},
-    el("h2", {}, l.heading, el("span", {class: "kind"}, kinds[l.kind] || l.kind)));
-  sec.append(el("ul", {class: "widgets"}, ...l.widgets.map(w => el("li", {}, w))));
+  const tally = ids.length
+    ? el("span", {class: "tally"}, `${ids.length} Inhalte`, dropped.length ? ", " : "",
+         dropped.length ? el("b", {}, `${dropped.length} unpassend`) : "")
+    : null;
+  const sec = el("section", {class: "lane", id: l.id},
+    el("div", {class: "lane-head"}, el("h2", {}, l.heading), el("span", {class: "kind"}, KINDS[l.kind] || l.kind), tally));
+  if (l.widgets.length) {
+    sec.append(remembered(l.id + ":widgets", el("summary", {}, `Widgets (${l.widgets.length})`),
+      el("ul", {}, ...l.widgets.map(w => el("li", {}, w)))));
+    sec.lastChild.className = "widgets";
+  }
   if (!ids.length) { sec.append(el("p", {class: "empty"}, "Keine bewertbaren Inhalte in dieser Schwimmlinie.")); return sec; }
 
   const before = el("div", {}, el("h3", {}, `Ist-Stand (${ids.length})`),
@@ -189,64 +336,39 @@ function lane(l, cut) {
     kept.length ? el("ol", {}, ...kept.map((id, i) => entry(id, i + 1, cut, ids.indexOf(id) - i)))
                 : el("p", {class: "empty"}, "Nichts erreicht die Schwelle."));
   if (dropped.length) {
-    after.append(el("details", {class: "out"}, el("summary", {}, `Aussortiert (${dropped.length})`),
-      el("ol", {}, ...dropped.map((id, i) => entry(id, i + 1, cut)))));
+    const out = remembered(l.id + ":out", el("summary", {}, `Aussortiert (${dropped.length})`),
+      el("ol", {}, ...dropped.map(id => entry(id, ids.indexOf(id) + 1, cut))));
+    out.className = "out";
+    after.append(out);
   }
   sec.append(el("div", {class: "cols"}, before, after));
   return sec;
 }
 
-const TEXT_NAMES = {description: "Beschreibung", compendium: "kompendialer Text"};
-
-// Both texts are shown; the one the materials were measured against is marked
-// and open, the other folded -- the compendium can run to many paragraphs.
-function topicTexts(t, choice) {
-  const used = choice.used === "both" ? ["description", "compendium"] : [choice.used];
-  const out = [];
-  if (choice.used !== choice.chosen && choice.chosen !== "both") {
-    out.push(el("p", {class: "small"},
-      `Kein Text „${TEXT_NAMES[choice.chosen]}“ hinterlegt – ` +
-      (choice.used === "none" ? "gemessen wird nur an Titel und Schlagworten."
-                              : `stattdessen ${TEXT_NAMES[choice.used] || "beides"} genutzt.`)));
-  }
-  for (const key of ["description", "compendium"]) {
-    const text = t[key];
-    const mark = used.includes(key) ? el("span", {class: "used"}, "für den Abgleich genutzt") : null;
-    if (!text) { out.push(el("p", {class: "small"}, `Kein Text „${TEXT_NAMES[key]}“ hinterlegt.`)); continue; }
-    const attrs = {class: "comp"};
-    if (used.includes(key)) attrs.open = "";
-    out.push(el("details", attrs, el("summary", {}, key === "description" ? "Beschreibung" : "Kompendialer Text", mark),
-                el("p", {}, text)));
-  }
-  return out;
-}
-
-function draw() {
-  const cut = Number($("cut")?.value ?? data.threshold);
-  const t = data.topic;
+function drawLanes() {
+  const cut = Number($("cut").value);
   const all = Object.values(data.items);
   const misfits = all.filter(m => m.score < cut).length;
+  $("count").replaceChildren(el("mark", {}, `${misfits} von ${all.length}`), " Inhalten passen nicht zum Thema");
+  $("cutval").textContent = cut.toFixed(2);
+  $("lanes").replaceChildren(...data.lanes.map(l => lane(l, cut)));
+}
 
-  const slider = el("input", {type: "range", id: "cut", min: "0", max: "1", step: "0.01", value: String(cut),
-                              "aria-label": "Schwelle für passend"});
-  slider.oninput = draw;
-  const head = el("header", {class: "topic"},
-    el("h1", {}, link(t.title, t.url)),
-    ...topicTexts(t, data.topic_text),
-    t.keywords.length ? el("p", {class: "small"}, "Schlagworte: " + t.keywords.join(", ")) : null,
-    el("div", {class: "cut"}, el("span", {}, el("strong", {}, `${misfits} von ${all.length}`), " Inhalten passen nicht zum Thema"),
-      el("label", {}, "Schwelle ", slider, " ", el("strong", {}, cut.toFixed(2)))),
-    el("p", {class: "small"}, `Bewertet mit ${data.backend}. Quelle: ${data.repository}.`));
-  if (data.notes.length) head.append(el("ul", {class: "notes"}, ...data.notes.map(n => el("li", {}, n))));
+// --- Requests ---------------------------------------------------------------
 
-  const focused = document.activeElement?.id === "cut";
-  $("out").replaceChildren(head, ...data.lanes.map(l => lane(l, cut)));
-  if (focused) $("cut").focus();
+async function post(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Demo-Password": $("pw").value},
+    body: JSON.stringify(body),
+  });
+  const answer = await res.json().catch(() => ({error: `Antwort ohne JSON (HTTP ${res.status}).`}));
+  if (res.status === 401) $("pwbox").hidden = false;
+  return {res, answer};
 }
 
 function offerChoices(message, choices, original) {
-  $("status").className = "status";
-  $("status").replaceChildren(message + " Welche ist gemeint?",
+  setStatus("", message + " Welche ist gemeint?",
     el("div", {class: "choices"}, ...choices.map(c => {
       const b = el("button", {type: "button", title: c.id}, c.title);
       b.onclick = () => run(c.id, original);
@@ -254,9 +376,25 @@ function offerChoices(message, choices, original) {
     })));
 }
 
-$("f").onsubmit = ev => { ev.preventDefault(); run($("url").value.trim()); };
-for (const b of document.querySelectorAll(".examples button")) {
-  b.onclick = () => { $("url").value = b.dataset.url; run(b.dataset.url); };
+async function run(url, label = url) {
+  $("go").disabled = true;
+  $("intro").hidden = true;
+  setStatus("loading", "Themenseite wird gelesen und bewertet. Bei großen Seiten mit Unterthemen dauert das einige Sekunden.");
+  try {
+    const {res, answer} = await post("/api/analyze", {url, topic_text: $("topictext").value,
+      subcollections: $("subs").checked, run_searches: $("searches").checked});
+    if (res.status === 409 && answer.choices) { offerChoices(answer.error, answer.choices, label); return; }
+    if (!res.ok) throw new Error(answer.error || `HTTP ${res.status}`);
+    data = answer;
+    opened.clear();
+    setStatus("");
+    drawSheet();
+    remember(url, data.topic.title);
+  } catch (err) {
+    setStatus("error", err.message);
+  } finally {
+    $("go").disabled = false;
+  }
 }
 
 function mark(value, yes, no) {
@@ -264,23 +402,18 @@ function mark(value, yes, no) {
   return el("span", {class: "tag" + (value ? " yes" : "")}, value ? yes : no);
 }
 
-$("sf").onsubmit = async ev => {
-  ev.preventDefault();
+async function search() {
+  const text = $("q").value.trim();
+  if (!text) { $("q").focus(); return; }
   $("sgo").disabled = true;
-  $("results").replaceChildren(el("p", {class: "status"}, "Suche läuft …"));
+  $("results").replaceChildren(el("p", {class: "panel"}, "Suche läuft …"));
   try {
-    const res = await fetch("/api/search", {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "X-Demo-Password": $("pw").value},
-      body: JSON.stringify({text: $("q").value.trim(), subject: $("subject").value.trim()}),
-    });
-    const body = await res.json().catch(() => ({error: `Antwort ohne JSON (HTTP ${res.status}).`}));
-    if (res.status === 401) $("pwbox").hidden = false;
-    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-    const notes = body.unresolved.map(u => el("p", {class: "status error"},
+    const {res, answer} = await post("/api/search", {text, subject: $("subject").value.trim()});
+    if (!res.ok) throw new Error(answer.error || `HTTP ${res.status}`);
+    const notes = answer.unresolved.map(u => el("p", {class: "panel"},
       `Fach „${u.value}“ unbekannt, Filter nicht angewandt` +
       (u.suggestions?.length ? ` – gemeint vielleicht: ${u.suggestions.join(", ")}` : "") + "."));
-    const items = body.hits.map(h => {
+    const items = answer.hits.map(h => {
       const b = el("button", {type: "button", title: h.id}, el("strong", {}, h.title),
         mark(h.has_compendium, "Kompendientext", "kein Kompendientext"),
         mark(h.has_layout, "Seitenlayout", "kein Seitenlayout"));
@@ -288,43 +421,20 @@ $("sf").onsubmit = async ev => {
       return el("li", {}, b);
     });
     $("results").replaceChildren(...notes,
-      items.length ? el("ul", {}, ...items) : el("p", {class: "status"}, "Keine Sammlung gefunden."),
-      ...(body.warnings || []).map(w => el("p", {class: "small"}, w)));
+      items.length ? el("ul", {}, ...items) : el("p", {class: "panel"}, "Keine Sammlung gefunden."));
   } catch (err) {
-    $("results").replaceChildren(el("p", {class: "status error"}, err.message));
+    $("results").replaceChildren(el("p", {class: "panel"}, err.message));
   } finally {
     $("sgo").disabled = false;
   }
-};
-
-async function run(url, label = url) {
-  $("go").disabled = true;
-  $("status").className = "status";
-  $("status").textContent = "Themenseite wird gelesen und bewertet …";
-  try {
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "X-Demo-Password": $("pw").value},
-      body: JSON.stringify({url, topic_text: $("topictext").value, subcollections: $("subs").checked,
-                            run_searches: $("searches").checked}),
-    });
-    const body = await res.json().catch(() => ({error: `Antwort ohne JSON (HTTP ${res.status}).`}));
-    if (res.status === 401) $("pwbox").hidden = false;
-    if (res.status === 409 && body.choices) { offerChoices(body.error, body.choices, label); return; }
-    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-    data = body;
-    $("status").textContent = "";
-    $("out").replaceChildren();  // new page: start from the default threshold
-    draw();
-    // A chosen candidate is remembered by its id: the portal URL alone stays ambiguous.
-    remember(url, data.topic.title);
-  } catch (err) {
-    $("status").className = "status error";
-    $("status").textContent = err.message;
-  } finally {
-    $("go").disabled = false;
-  }
 }
+
+$("f").onsubmit = ev => { ev.preventDefault(); run($("url").value.trim()); };
+for (const b of document.querySelectorAll(".examples button")) {
+  b.onclick = () => { $("url").value = b.dataset.url; run(b.dataset.url); };
+}
+$("sgo").onclick = search;
+$("q").onkeydown = $("subject").onkeydown = ev => { if (ev.key === "Enter") { ev.preventDefault(); search(); } };
 drawHistory();
 
 fetch("/api/config").then(r => r.json()).then(cfg => {

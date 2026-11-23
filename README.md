@@ -34,6 +34,14 @@ Vorausgefüllt ist die Optik-Seite; drei Beispiel-Knöpfe (Physik: Optik,
 Mathematik: Räumliche und ebene Geometrie, Informatik: Technische Informatik)
 prüfen mit einem Klick.
 
+**Wo die Texte herkommen:** Die Beschreibung einer Sammlung steht im
+`collection`-Objekt der Sammlungs-API (`GET /collection/v1/collections/-home-/{id}`,
+Feld `collection.description`), nicht in den Eigenschaften, die `describe`
+liest – dort war sie bei Optik leer. Die App fragt deshalb zuerst die
+Sammlungs-API und nimmt die Eigenschaften nur als Rückfall. Der kompendiale Text
+(`ccm:oeh_collection_compendium_text`) ist Markdown; Inhaltsverzeichnis,
+Überschriftenzeichen und Links werden vor Anzeige und Abgleich entfernt.
+
 **Woran gemessen wird, ist wählbar:** an der **Beschreibung der Themenseite**
 (Standard, kürzer), am **kompendialen Text** oder an **beidem** – jeweils
 zusammen mit Titel und Schlagworten. Fehlt der gewählte Text, springt der andere
@@ -166,6 +174,7 @@ unter den Hinweisen.
 |---|---|
 | `collect.py` | Themenseite in Schwimmlinien lesen: Seitenlayout, Sammlung, Untersammlungen |
 | `saved_search.py` | gespeicherte Widget-Suchen angenähert ausführen |
+| `topic_text.py` | Beschreibung aus der Sammlungs-API, Markdown zu Klartext |
 | `urls.py` | Knoten-ID aus einer edu-sharing-URL oder ID lesen |
 | `portal.py` | Portal-URL (WordPress) auf die Sammlung dahinter auflösen |
 | `serialize.py` | Ergebnis als JSON für die Web-App |
